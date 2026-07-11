@@ -1,47 +1,48 @@
 # Lattice Reader
 
-Read a paper. Select a passage, press **G**, get an explanation of *that passage only* — with the entire paper as context. Press **A** to annotate.
+*Ask one thing at a time. How you want it.*
 
-No backend. The PDF never leaves your tab. Your API key lives in localStorage.
+Select a passage, press **G**, get an explanation of *that passage only* — with the paper as context. Press **A** to annotate.
+
+No backend. The PDF never leaves the tab. Keys and sessions sit in localStorage.
 
 ## Run
-
 ```bash
-npm install
-npm run dev
+npm install && npm run dev
 ```
 
-## Deploy (Render)
+## Deploy
+`render.yaml` included. Static site, `npm ci && npm run build`, publish `dist`.
 
-`render.yaml` is included. New → Static Site → point at the repo. Build `npm ci && npm run build`, publish `dist`.
+## Keys
 
-## How it works
-
-- **PDF.js** renders each page to canvas with a transparent, selectable text layer on top. That's what makes selection possible at all — Chrome's built-in PDF viewer won't give you the selected text.
-- **Full paper as system prompt.** On Anthropic, the paper is sent with `cache_control: ephemeral`, so the first call pays to write the cache and every subsequent snippet reads it at ~10% cost.
-- **Selection reuse.** Before opening a thread, `findExistingChat` normalizes whitespace and checks whether the new selection is a substring of an already-answered one. If so it just reopens that thread instead of burning a call.
-- **Dark paper** is a CSS `invert(1) hue-rotate(180deg)` on the canvas. Figures and photos come out roughly correct because hue-rotate undoes the color flip; only luminance is inverted.
-
-## Modes
-
-| Mode | What it appends |
+| | |
 |---|---|
-| Define | Glossary of every technical term in the selection, using the paper's own meanings |
-| Ground up | Assumes zero background; teaches the underlying idea first, with an analogy |
-| Technical | Assumes you know the area; goes straight to what the passage is doing and what it's quietly assuming |
-| Custom | Whatever you type, appended to every message in that thread |
+| `G` | explain selection |
+| `A` | annotate selection |
+| `E` | exit focus mode |
+| `Esc` | close settings / focus |
+| `Ctrl`/`Cmd` + scroll | zoom, while over the paper |
 
-## Providers
+## The rail
 
-Anthropic, OpenAI, OpenRouter, Ollama. Ollama needs CORS: `OLLAMA_ORIGINS=* ollama serve`.
+Papers stack bottom-up: 1 stays at the bottom, 2 appears above it. Each paper is a fully isolated session — its own threads, annotations, and page range. Below the shelf: add, invert, focus, settings.
 
-## Usage meter
+## Page range
 
-Token counts come from the `usage` object in each API response and accumulate in localStorage; cost is estimated against list prices in `src/lib/llm.js`. This is *not* your account balance — that needs an admin key, which shouldn't be in a browser.
+The slider scopes how much of the paper is sent as context. Locks once the first thread opens, because changing it would invalidate every answer already given; editing it then prompts, and discards that paper's threads (annotations survive).
 
-## Known gaps (deliberate, it's an MVP)
+Practical use: a 60-page paper with appendices costs the same per question as its 8-page core. Scope to the core.
 
-- Text extraction is naive `getTextContent()`. Two-column papers will interleave. Fix later with x/y-aware reflow.
-- Markdown in responses renders as plain text.
-- Selection reuse is substring-based, not geometric. It won't catch a selection that overlaps two existing threads.
-- No PDF for equations — LaTeX in the text layer comes out as garbage glyphs on some papers.
+## Notes
+
+- **Prompt caching.** On Anthropic the paper goes in the system block with `cache_control: ephemeral`. First call writes the cache; every snippet after reads it at ~10% cost. Keep this if you refactor — it's the whole economics of the tool.
+- **Thread reuse.** `store.findExistingChat` normalizes whitespace and checks whether a new selection sits inside an already-answered one. If so it reopens that thread instead of spending a call.
+- **Dark paper** is `invert(1) hue-rotate(180deg)` on the canvas. Hue-rotate undoes the color flip, so figures survive while text inverts.
+- **Files are not persisted.** localStorage cannot hold a PDF. Sessions survive a reload; the file must be re-dropped, and the fingerprint (name + size + first-page text) reattaches it to its threads.
+
+## Gaps
+
+- Text extraction is naive `getTextContent()` — two-column papers interleave. This is the first thing worth fixing; it degrades the context you're paying to cache.
+- Responses render as plain text, no markdown.
+- Thread reuse is substring-based, not geometric.
