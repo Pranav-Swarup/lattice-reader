@@ -113,13 +113,13 @@ export default function ChatPanel({
       ) : !chat ? (
         <>
           <div className="chat-empty">
-            <p>Ask anything about the paper below, or select text and press <kbd>G</kbd> to open a thread about that passage. <kbd>A</kbd> annotates.</p>
+            <p>Ask anything about the document below, or select text and press <kbd>G</kbd> to open a thread about that passage. <kbd>A</kbd> annotates.</p>
           </div>
           <div className="composer">
             <textarea
               rows={2}
               value={draft}
-              placeholder="Ask anything about the paper…"
+              placeholder="Ask anything about the document…"
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -131,10 +131,12 @@ export default function ChatPanel({
               }}
             />
             <button
+              className="send"
               disabled={busy || !draft.trim()}
+              title="Send"
               onClick={() => { onAsk(null, draft.trim()); setDraft('') }}
             >
-              Send
+              <svg viewBox="0 0 20 20"><path d="M3 10h13M11 5l5 5-5 5" /></svg>
             </button>
           </div>
         </>
@@ -180,13 +182,7 @@ export default function ChatPanel({
           </div>}
 
           <div className="msgs">
-            {chat.selection !== '' && chat.messages.length === 0 && !busy && (
-              <div className="armed-hint">
-                <b>{modeLabel}</b> mode armed. Press <kbd>Enter</kbd> to ask,
-                or type extra instructions first.
-              </div>
-            )}
-            {chat.messages.map((m, i) => (
+                        {chat.messages.map((m, i) => (
               <div key={i} className={'msg ' + m.role}>
                 {m.role === 'assistant'
                   ? <Markdown text={m.content} />
@@ -205,10 +201,10 @@ export default function ChatPanel({
               autoFocus
               placeholder={
                 !chat.selection
-                  ? 'Ask anything about the paper…'
+                  ? 'Ask anything about the document…'
                   : started
-                    ? 'Follow-up… (empty Enter re-asks in ' + modeLabel + ' mode)'
-                    : 'Enter sends the ' + modeLabel + ' explanation…'
+                    ? 'Ask a follow-up…'
+                    : 'Press Enter to ask…'
               }
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
@@ -221,12 +217,21 @@ export default function ChatPanel({
               }}
             />
             <button
+              className="send"
               disabled={busy}
+              title={started && draft.trim() ? 'Send' : 'Ask'}
               onClick={() => { onAsk(chat.id, draft.trim()); setDraft('') }}
             >
-              {started && draft.trim() ? 'Send' : 'Ask'}
+              <svg viewBox="0 0 20 20"><path d="M3 10h13M11 5l5 5-5 5" /></svg>
             </button>
           </div>
+          {chat.selection && (
+            <div className="composer-hint">
+              {started
+                ? <>Empty <kbd>Enter</kbd> re-asks in <b>{modeLabel}</b> mode.</>
+                : <><b>{modeLabel}</b> mode armed. <kbd>Enter</kbd> sends; type first to add instructions.</>}
+            </div>
+          )}
         </>
       )}
     </aside>

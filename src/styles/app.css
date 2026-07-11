@@ -94,6 +94,7 @@ code { font-family: var(--mono); font-size: 12px; color: var(--sage); }
   color: var(--on-clay); font-weight: 500;
 }
 /* Fixed, so it escapes the rail's overflow:hidden and stacking context. */
+.tip-wrap { display: contents; }
 .railtip {
   position: fixed; z-index: 200;
   transform: translateY(-50%);
@@ -103,6 +104,7 @@ code { font-family: var(--mono); font-size: 12px; color: var(--sage); }
   pointer-events: none; box-shadow: 0 6px 20px rgba(0,0,0,.35);
   max-width: 280px; overflow: hidden; text-overflow: ellipsis;
 }
+.railtip.muted { color: var(--ink-3); font-weight: 400; }
 
 .rail-tools {
   flex: none; display: flex; flex-direction: column; align-items: center; gap: 7px;
@@ -354,26 +356,30 @@ code { font-family: var(--mono); font-size: 12px; color: var(--sage); }
 
 /* ---------------- library ---------------- */
 .library {
-  flex: 1; overflow-y: auto; padding: 60px 48px 60px;
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: clamp(32px, 6vh, 64px) clamp(20px, 4vw, 48px);
   display: flex; flex-direction: column; align-items: center;
+  justify-content: safe center;   /* centered, but never clips the top when full */
   transition: background .18s;
 }
 .library.over { background: rgba(128,128,128,.06); }
-.lib-head { text-align: center; margin-bottom: 44px; }
+.lib-head { flex: none; text-align: center; margin-bottom: clamp(24px, 4vh, 44px); }
 .lib-head h1 {
   font-family: var(--wordmark); font-weight: 400;
-  font-size: 54px; margin: 0 0 8px; letter-spacing: .01em;
+  font-size: clamp(36px, 5vw, 56px); margin: 0 0 8px; letter-spacing: .01em;
 }
-.lib-head p { color: var(--ink-2); font-size: 17px; margin: 0; }
+.lib-head p { color: var(--ink-2); font-size: clamp(14px, 1.4vw, 17px); margin: 0; }
 
 .lib-grid {
-  display: grid; gap: 20px; width: 100%; max-width: 940px;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  flex: none;
+  display: grid; gap: clamp(14px, 1.6vw, 22px);
+  width: 100%; max-width: 1100px; margin: 0 auto;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(150px, 15vw, 200px), 1fr));
 }
-.card {
-  position: relative; display: flex; flex-direction: column; gap: 10px;
-  background: transparent; border: 0; padding: 0;
-  cursor: pointer; text-align: left;
+.card { position: relative; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.card-hit {
+  display: block; width: 100%; padding: 0;
+  background: transparent; border: 0; cursor: pointer;
 }
 .card-face {
   position: relative; aspect-ratio: 4 / 3;
@@ -392,23 +398,67 @@ code { font-family: var(--mono); font-size: 12px; color: var(--sage); }
   font-family: var(--mono); font-size: 12px; color: var(--ink-3);
 }
 .card-name {
-  font-size: 14px; color: var(--ink-2); line-height: 1.45;
+  font-size: 13.5px; color: var(--ink-2); line-height: 1.45;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden;
+  overflow: hidden; overflow-wrap: anywhere; min-height: 2.9em;
 }
 .card:hover .card-name { color: var(--ink); }
-.card-del {
+.card-tools {
   position: absolute; top: 8px; right: 8px; z-index: 3;
-  width: 26px; height: 26px; border-radius: 50%;
+  display: flex; gap: 5px; opacity: 0; transition: opacity .14s;
+}
+.card:hover .card-tools, .card-tools:focus-within { opacity: 1; }
+.card-btn {
+  width: 27px; height: 27px; border-radius: 50%;
   display: grid; place-items: center;
   background: var(--bg-3); border: 1px solid var(--line);
-  color: var(--ink-3); opacity: 0; transition: .14s;
+  color: var(--ink-3); cursor: pointer; transition: .14s;
 }
-.card-del svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-.card:hover .card-del { opacity: 1; }
-.card-del:hover { background: var(--brick); border-color: var(--brick); color: #fff; }
+.card-btn svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.card-btn:hover { background: var(--clay); border-color: var(--clay); color: var(--on-clay); }
+.card-btn.del:hover { background: var(--brick); border-color: var(--brick); color: #fff; }
+
+.card-rename {
+  width: 100%; background: var(--bg-3);
+  border: 1px solid var(--clay); border-radius: 6px;
+  padding: 6px 9px; font-size: 13.5px; color: var(--ink); outline: none;
+}
 .card.add .card-face { border-style: dashed; }
 .card.add:hover .card-face { border-color: var(--clay); color: var(--clay); }
+
+/* ---------------- setup guide ---------------- */
+.guide-btn { align-self: flex-start; margin-top: 12px; }
+.modal.guide {
+  width: 760px; max-width: 94vw; max-height: 88vh; overflow-y: auto;
+  text-align: left;
+}
+.modal.guide h3 { text-align: center; }
+.modal.guide .modal-body { text-align: center; }
+.guide-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px; margin-top: 8px;
+}
+.guide-grid section {
+  background: var(--bg-3); border: 1px solid var(--line);
+  border-radius: 10px; padding: 16px 18px;
+}
+.guide-grid h4 {
+  margin: 0 0 10px; font-size: 15px; font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+}
+.guide-grid .tag {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+  background: var(--sage); color: var(--on-sage);
+  border-radius: 20px; padding: 2px 8px; font-weight: 500;
+}
+.guide-grid ol { margin: 0; padding-left: 18px; }
+.guide-grid li { font-size: 13.5px; line-height: 1.75; color: var(--ink-2); margin: 4px 0; }
+.guide-grid li b { color: var(--ink); font-weight: 500; }
+.guide-grid a { color: var(--blue); }
+.guide-note {
+  margin: 12px 0 0; padding-top: 11px; border-top: 1px solid var(--line);
+  font-size: 12.5px; line-height: 1.65; color: var(--ink-3);
+}
 
 /* ---------------- theme carousel ---------------- */
 .carousel {
@@ -529,19 +579,19 @@ code { font-family: var(--mono); font-size: 12px; color: var(--sage); }
   color: transparent; position: absolute; white-space: pre;
   cursor: text; transform-origin: 0 0;
 }
-.textLayer ::selection { background: rgba(90,150,230,.45); }
+.textLayer ::selection { background: rgba(150,186,222,.42); }
 .textLayer br::selection { background: transparent; }
 
 /* highlights */
 .hl { position: absolute; z-index: 1; pointer-events: none; border-radius: 2px; }
-.hl-sel { background: rgba(90,150,230,.32); }
+.hl-sel { background: rgba(150,186,222,.34); }
 .hl-saved { transition: filter .12s; }
 .hl-saved:hover { filter: brightness(1.25) saturate(1.3); }
-.hl.c-yellow { background: rgba(250,204,21,.42); }
-.hl.c-blue   { background: rgba(90,150,230,.36); }
-.hl.c-green  { background: rgba(74,200,140,.36); }
-.hl.c-pink   { background: rgba(240,120,180,.36); }
-.hl.c-orange { background: rgba(250,140,60,.38); }
+.hl.c-butter { background: rgba(232,208,122,.40); }
+.hl.c-sky    { background: rgba(150,186,222,.40); }
+.hl.c-sage   { background: rgba(157,200,168,.40); }
+.hl.c-rose   { background: rgba(226,165,186,.40); }
+.hl.c-clay   { background: rgba(226,172,136,.42); }
 
 /* ---------------- chat ---------------- */
 .chat {
@@ -663,12 +713,24 @@ code { font-family: var(--mono); font-size: 12px; color: var(--sage); }
   padding: 9px 11px; font-size: 14.5px; outline: none;
 }
 .composer textarea:focus { border-color: var(--clay); }
-.composer button {
+.composer button.send {
+  flex: none; width: 42px; align-self: stretch;
+  display: grid; place-items: center;
   background: var(--clay); color: var(--on-clay); border: 0;
-  border-radius: 7px; padding: 0 14px;
-  font-weight: 500; font-size: 12.5px; cursor: pointer;
+  border-radius: 8px; cursor: pointer;
+}
+.composer button.send svg {
+  width: 19px; height: 19px; fill: none; stroke: currentColor;
+  stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round;
 }
 .composer button:disabled { opacity: .32; cursor: default; }
+.composer-hint {
+  flex: none; padding: 0 12px 11px;
+  font-size: 11.5px; line-height: 1.6; color: var(--ink-3);
+}
+.composer-hint b { color: var(--sage); font-weight: 500; }
+.composer-hint kbd { font-size: 10px; padding: 0 4px; }
+.composer { padding-bottom: 8px; }
 
 /* notes */
 .notes { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
@@ -738,3 +800,48 @@ code { font-family: var(--mono); font-size: 12px; color: var(--sage); }
 .sig { margin-top: auto; text-align: center; font-size: 13.5px; color: var(--ink-2); padding: 16px 0 4px; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+
+/* ---------------- responsive hardening ---------------- */
+/* Nothing should be able to push the layout wider than the viewport. */
+.app, .stage, .split, .reader, .chat, .chat-slot { min-width: 0; min-height: 0; }
+.msg, .md, .quote-edit, .titem-txt, .note-body, .head-now {
+  overflow-wrap: anywhere;
+}
+.md pre, .md table { max-width: 100%; }
+
+/* Short viewports: shrink the rail so the tool stack always fits. */
+@media (max-height: 760px) {
+  .tool { width: 42px; height: 42px; }
+  .tool svg { width: 20px; height: 20px; }
+  .tool.gear { width: 46px; height: 46px; }
+  .slot { width: 40px; height: 40px; font-size: 13px; }
+  .rail { padding: 12px 0 14px; }
+  .rail-tools, .rail-top { gap: 5px; }
+  :root { --rail: 66px; }
+}
+@media (max-height: 620px) {
+  .tool { width: 36px; height: 36px; border-radius: 9px; }
+  .tool svg { width: 18px; height: 18px; }
+  .tool.gear { width: 40px; height: 40px; }
+  .slot { width: 34px; height: 34px; font-size: 12px; }
+  .brandmark svg { width: 24px; height: 24px; }
+  :root { --rail: 58px; }
+}
+
+/* Narrow viewports: the chat panel can't be allowed to squeeze the reader out. */
+@media (max-width: 1100px) {
+  .chat-slot { max-width: 46vw; }
+}
+@media (max-width: 860px) {
+  .split { flex-direction: column; }
+  .chat-slot { width: 100% !important; max-width: none; height: 45%; }
+  .grip { display: none; }
+  .reader { min-height: 55%; }
+  .chat-stub { top: auto; bottom: 12px; right: 12px; border-radius: 8px; }
+}
+
+/* Very wide screens: keep the reader from becoming an ocean of margin. */
+@media (min-width: 2000px) {
+  .lib-grid { max-width: 1400px; }
+}

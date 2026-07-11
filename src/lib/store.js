@@ -19,7 +19,7 @@ export const loadSettings = () =>
     paperDark: false,
     chatWidth: 420,
     theme: 'ember-study',
-    highlightColor: 'yellow',
+    highlightColor: 'butter',
   })
 export const saveSettings = (s) => write(K.settings, s)
 

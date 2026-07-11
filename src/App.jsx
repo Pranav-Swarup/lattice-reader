@@ -210,7 +210,7 @@ export default function App() {
       const verb = chat.messages.length ? 'Re-explain' : 'Explain'
       runTurn(id, base, `${verb} this passage. (${label})`)
     } else if (chat.messages.length === 0) {
-      runTurn(id, base + '\n\nADDITIONALLY: ' + text, `Explain this passage. (${label}) — ${text}`)
+      runTurn(id, base + '\n\nADDITIONALLY: ' + text, `Explain this snippet. (${label}) — ${text}`)
     } else {
       runTurn(id, text, text)
     }
@@ -300,7 +300,7 @@ export default function App() {
                 <h1>Lattice Reader</h1>
                 <p>Ask one thing at a time. How you want it.</p>
                 <button className="cta" onClick={() => fileInput.current?.click()}>
-                  {pending ? 'Opening…' : 'Add paper'}
+                  {pending ? 'Opening…' : 'Add a document'}
                 </button>
               </div>
             </div>
@@ -308,6 +308,8 @@ export default function App() {
           <Library
             library={library} activeId={activeId} dragging={dragging}
             onOpen={openPaper} onDelete={deletePaper}
+            onRename={(id, name) =>
+              setLibrary((lib) => lib.map((x) => x.id === id ? { ...x, name } : x))}
             onAdd={() => fileInput.current?.click()}
           />
           )

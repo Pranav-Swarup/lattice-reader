@@ -1,10 +1,13 @@
 import { PROVIDERS } from '../lib/llm'
 import { THEMES } from '../lib/themes'
+import { useState } from 'react'
+import SetupGuide from './SetupGuide'
 
 export default function Settings({ open, onClose, settings, setSettings, usage, onResetUsage }) {
   if (!open) return null
   const p = PROVIDERS[settings.provider]
   const set = (patch) => setSettings({ ...settings, ...patch })
+  const [guide, setGuide] = useState(false)
   const ti = Math.max(0, THEMES.findIndex((t) => t.id === settings.theme))
   const cycle = (d) => set({ theme: THEMES[(ti + d + THEMES.length) % THEMES.length].id })
 
@@ -28,6 +31,10 @@ export default function Settings({ open, onClose, settings, setSettings, usage, 
         <datalist id="models">
           {p.models.map((m) => <option key={m} value={m} />)}
         </datalist>
+
+        <button className="ghost guide-btn" onClick={() => setGuide(true)}>
+          How do I get an API key?
+        </button>
 
         {settings.provider === 'ollama' ? (
           <>
@@ -80,6 +87,7 @@ export default function Settings({ open, onClose, settings, setSettings, usage, 
 
         <p className="sig">made by pranav :)</p>
       </div>
+      <SetupGuide open={guide} onClose={() => setGuide(false)} />
     </div>
   )
 }

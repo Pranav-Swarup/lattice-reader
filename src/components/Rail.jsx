@@ -19,16 +19,18 @@ function Tip({ label, children, className, ...rest }) {
   const [box, setBox] = useState(null)
   return (
     <>
-      <button
-        {...rest}
-        className={className}
+      <span
+        className="tip-wrap"
         onMouseEnter={(e) => setBox(e.currentTarget.getBoundingClientRect())}
         onMouseLeave={() => setBox(null)}
       >
-        {children}
-      </button>
-      {box && !rest.disabled && (
-        <span className="railtip" style={{ left: box.right + 12, top: box.top + box.height / 2 }}>
+        <button {...rest} className={className}>{children}</button>
+      </span>
+      {box && label && (
+        <span
+          className={'railtip' + (rest.disabled ? ' muted' : '')}
+          style={{ left: box.right + 12, top: box.top + box.height / 2 }}
+        >
           {label}
         </span>
       )}
@@ -84,7 +86,7 @@ export default function Rail({
       </div>
 
       <div className="rail-tools">
-        <Tip className="tool" onClick={onAdd} label="Add a paper"><Ico d={I.add} /></Tip>
+        <Tip className="tool" onClick={onAdd} label="Add a document"><Ico d={I.add} /></Tip>
         <Tip
           className={'tool' + (highlighterOn ? ' on' : '')}
           onClick={(e) => { track('highlight')(e); onHighlighter() }}
