@@ -17,7 +17,9 @@ export const loadSettings = () =>
     keys: {},
     ollamaUrl: 'http://localhost:11434',
     paperDark: false,
-    chatWidth: 400,
+    chatWidth: 420,
+    theme: 'ember-study',
+    highlightColor: 'yellow',
   })
 export const saveSettings = (s) => write(K.settings, s)
 
@@ -31,7 +33,7 @@ export const resetUsage = () => write(K.usage, ZERO)
 export const loadLibrary = () => read(K.library, [])
 export const saveLibrary = (l) => write(K.library, l)
 
-export const loadDoc = (id) => read(K.docs, {})[id] ?? { chats: [], annotations: [], range: null }
+export const loadDoc = (id) => read(K.docs, {})[id] ?? { chats: [], annotations: [], highlights: [], range: null }
 export const saveDoc = (id, doc) => {
   const all = read(K.docs, {})
   all[id] = doc

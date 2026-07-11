@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 // Scopes how much of the paper gets sent as context. Locks once a thread exists,
 // because changing it would invalidate every answer already given.
-export default function RangeBar({ numPages, range, locked, onChange, onZoom, zoom }) {
+export default function RangeBar({ numPages, range, locked, onChange }) {
   const [lo, setLo] = useState(range[0])
   const [hi, setHi] = useState(range[1])
   useEffect(() => { setLo(range[0]); setHi(range[1]) }, [range])
@@ -51,11 +51,6 @@ export default function RangeBar({ numPages, range, locked, onChange, onZoom, zo
         <em>of {numPages}</em>
       </div>
 
-      <div className="zoomer">
-        <button onClick={() => onZoom(-0.15)} title="Zoom out">−</button>
-        <span>{Math.round(zoom * 100)}%</span>
-        <button onClick={() => onZoom(0.15)} title="Zoom in">+</button>
-      </div>
     </div>
   )
 }

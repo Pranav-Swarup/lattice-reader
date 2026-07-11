@@ -1,9 +1,12 @@
 import { PROVIDERS } from '../lib/llm'
+import { THEMES } from '../lib/themes'
 
 export default function Settings({ open, onClose, settings, setSettings, usage, onResetUsage }) {
   if (!open) return null
   const p = PROVIDERS[settings.provider]
   const set = (patch) => setSettings({ ...settings, ...patch })
+  const ti = Math.max(0, THEMES.findIndex((t) => t.id === settings.theme))
+  const cycle = (d) => set({ theme: THEMES[(ti + d + THEMES.length) % THEMES.length].id })
 
   return (
     <div className="drawer-bg" onClick={onClose}>
@@ -37,11 +40,11 @@ export default function Settings({ open, onClose, settings, setSettings, usage, 
             <label>API key</label>
             <input
               type="password"
-              placeholder={p.keyHint}
+              placeholder="This does not leave your device"
               value={settings.keys[settings.provider] || ''}
               onChange={(e) => set({ keys: { ...settings.keys, [settings.provider]: e.target.value } })}
             />
-            <p className="note">Stored in this browser only. It goes nowhere but the provider.</p>
+            <p className="note">This does not leave your device.</p>
           </>
         )}
 
@@ -57,6 +60,23 @@ export default function Settings({ open, onClose, settings, setSettings, usage, 
           Counted from the token totals each API response returns.
         </p>
         <button className="ghost" onClick={onResetUsage}>Reset counters</button>
+
+        <h3>Appearance</h3>
+        <label>Theme</label>
+        <div className="carousel">
+          <button onClick={() => cycle(-1)} aria-label="Previous theme">‹</button>
+          <div className="carousel-face">
+            <span className="carousel-name">{THEMES[ti].name}</span>
+            <span className="carousel-mode">{THEMES[ti].dark ? 'dark' : 'light'}</span>
+            <div className="swatches">
+              {['--bg-3', '--clay', '--sage', '--blue', '--wheat'].map((k) => (
+                <i key={k} style={{ background: THEMES[ti].vars[k] }} />
+              ))}
+            </div>
+          </div>
+          <button onClick={() => cycle(1)} aria-label="Next theme">›</button>
+        </div>
+
 
         <p className="sig">made by pranav :)</p>
       </div>

@@ -4,8 +4,12 @@ import ChatPanel from './components/ChatPanel'
 import Settings from './components/Settings'
 import Rail from './components/Rail'
 import RangeBar from './components/RangeBar'
+import Modal from './components/Modal'
+import Popover from './components/Popover'
+import Library from './components/Library'
 import { PROVIDERS } from './lib/llm'
 import { BASE_SYSTEM, buildUserTurn, MODES } from './lib/modes'
+import { applyTheme, HIGHLIGHT_COLORS } from './lib/themes'
 import * as store from './lib/store'
 
 export default function App() {
@@ -13,112 +17,120 @@ export default function App() {
   const [usage, setUsage] = useState(store.loadUsage)
   const [library, setLibrary] = useState(store.loadLibrary)
 
-  // Papers live in memory (the File can't be persisted); sessions live on disk.
-  const filesRef = useRef(new Map()) // id -> File
+  const filesRef = useRef(new Map())
   const [activeId, setActiveId] = useState(null)
-  const [doc, setDoc] = useState(null)      // { numPages, pages[] }
-  const [pending, setPending] = useState(null) // File awaiting fingerprint
+  const [doc, setDoc] = useState(null)
+  const [pending, setPending] = useState(null)
+  const [showLibrary, setShowLibrary] = useState(true)
 
   const [range, setRange] = useState([1, 1])
   const [chats, setChats] = useState([])
   const [annotations, setAnnotations] = useState([])
+  const [highlights, setHighlights] = useState([]) // persistent, from H
   const [threadId, setThreadId] = useState(null)
 
-  const [zoom, setZoom] = useState(1.35)
+  const [zoom, setZoom] = useState(1.3)
   const [focus, setFocus] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
-  const [liveHighlight, setLiveHighlight] = useState(null)
+  const [threadsOpen, setThreadsOpen] = useState(false)
+  const [chatCollapsed, setChatCollapsed] = useState(false)
   const [dragging, setDragging] = useState(false)
+
+  const [selHighlight, setSelHighlight] = useState(null) // transient (G / note focus)
+  const [modal, setModal] = useState(null)
+  const [noteDraft, setNoteDraft] = useState('')
+  const [pop, setPop] = useState(null) // {key, rect}
 
   const fileInput = useRef(null)
   const chatsRef = useRef(chats)
   useEffect(() => { chatsRef.current = chats }, [chats])
+  const settingsRef = useRef(settings)
+  useEffect(() => { settingsRef.current = settings }, [settings])
 
+  useEffect(() => { applyTheme(settings.theme) }, [settings.theme])
   useEffect(() => store.saveSettings(settings), [settings])
   useEffect(() => store.saveUsage(usage), [usage])
   useEffect(() => store.saveLibrary(library), [library])
   useEffect(() => {
-    if (activeId) store.saveDoc(activeId, { chats, annotations, range })
-  }, [activeId, chats, annotations, range])
+    if (activeId) store.saveDoc(activeId, { chats, annotations, highlights, range })
+  }, [activeId, chats, annotations, highlights, range])
 
   const locked = chats.length > 0
 
-  // --- open a file -> fingerprint -> restore or create its session ---
   const onDocLoaded = useCallback(async (d) => {
     setDoc(d)
     const file = pending
-    if (!file) return // only fires for a freshly-opened file
+    if (!file) return
     const id = await store.fingerprint(file, d.pages[0] || '')
     filesRef.current.set(id, file)
     setPending(null)
-
-    setLibrary((lib) => {
-      if (lib.some((p) => p.id === id)) return lib
-      return [...lib, { id, n: lib.length + 1, name: file.name, addedAt: Date.now() }]
-    })
-
+    setLibrary((lib) => lib.some((p) => p.id === id)
+      ? lib
+      : [...lib, { id, n: lib.length + 1, name: file.name, addedAt: Date.now() }])
     const saved = store.loadDoc(id)
     setActiveId(id)
     setChats(saved.chats)
     setAnnotations(saved.annotations)
+    setHighlights(saved.highlights || [])
     setRange(saved.range || [1, d.numPages])
-    setThreadId(null)
-    setError('')
+    setThreadId(null); setError(''); setSelHighlight(null); setShowLibrary(false)
   }, [pending])
 
   const openFile = (f) => {
     if (!f || f.type !== 'application/pdf') return
-    setDoc(null); setThreadId(null); setError(''); setPending(f)
+    setDoc(null); setThreadId(null); setError(''); setSelHighlight(null)
+    setPending(f)
+    setShowLibrary(false) // leave the library so the viewer mounts and parses
   }
 
-  // Switching papers is a full session swap.
-  const pickPaper = (p) => {
-    if (p.id === activeId) return
+  const openPaper = (p) => {
     const f = filesRef.current.get(p.id)
     if (!f) {
-      // Session survived a reload but the File didn't. Ask for it back.
-      alert(`"${p.name}" isn't loaded in this tab. Pick the file again — your threads are still saved.`)
-      fileInput.current?.click()
+      setModal({
+        kind: 'missing', name: p.name.replace(/\.pdf$/i, ''),
+        onOk: () => { setModal(null); fileInput.current?.click() },
+      })
       return
     }
-    setDoc(null); setThreadId(null); setError(''); setPending(f)
+    if (p.id === activeId && doc) { setShowLibrary(false); return }
+    setDoc(null); setThreadId(null); setError(''); setSelHighlight(null)
+    setPending(f); setShowLibrary(false)
   }
 
-  // --- context text, sliced to the chosen page range ---
+  // "Close" just returns to the library. Deletion happens there, explicitly.
+  const backToLibrary = () => { setShowLibrary(true); setChatCollapsed(false); setFocus(false) }
+
+  const deletePaper = (p) => setModal({
+    kind: 'delete', name: p.name.replace(/\.pdf$/i, ''),
+    onOk: () => {
+      store.dropDoc(p.id)
+      filesRef.current.delete(p.id)
+      setLibrary((lib) => lib.filter((x) => x.id !== p.id).map((x, i) => ({ ...x, n: i + 1 })))
+      if (p.id === activeId) {
+        setActiveId(null); setDoc(null); setChats([]); setAnnotations([]); setHighlights([])
+        setThreadId(null); setSelHighlight(null)
+      }
+      setModal(null)
+    },
+  })
+
   const contextText = useMemo(() => {
     if (!doc) return ''
-    return doc.pages
-      .slice(range[0] - 1, range[1])
-      .map((t, i) => `\n--- page ${range[0] + i} ---\n${t}`)
-      .join('\n')
+    return doc.pages.slice(range[0] - 1, range[1])
+      .map((t, i) => `\n--- page ${range[0] + i} ---\n${t}`).join('\n')
   }, [doc, range])
 
-  const changeRange = (next) => {
-    if (locked) {
-      const ok = confirm(
-        'Changing the context range will discard every open thread for this paper. ' +
-        'Annotations are kept. Continue?'
-      )
-      if (!ok) return
-      setChats([]); setThreadId(null)
-    }
-    setRange(next)
-  }
-
-  // --- LLM ---
   const callLLM = useCallback(async (messages) => {
     const prov = PROVIDERS[settings.provider]
     const key = settings.keys[settings.provider]
     if (settings.provider !== 'ollama' && !key) throw new Error('Add an API key in Settings first.')
     const r = await prov.send({
-      apiKey: key,
-      model: settings.model,
+      apiKey: key, model: settings.model,
       system: BASE_SYSTEM(contextText, range),
-      messages,
-      baseUrl: settings.ollamaUrl,
+      messages, baseUrl: settings.ollamaUrl,
     })
     setUsage((u) => ({
       calls: u.calls + 1,
@@ -131,7 +143,7 @@ export default function App() {
   }, [settings, contextText, range])
 
   const runTurn = useCallback(async (id, userMsg, display) => {
-    setLiveHighlight(null) // highlight is ephemeral: gone once the prompt is sent
+    setSelHighlight(null)
     setBusy(true); setError('')
     try {
       const chat = chatsRef.current.find((c) => c.id === id)
@@ -143,50 +155,71 @@ export default function App() {
         ? { ...c, messages: [...c.messages, { role: 'assistant', content: text }] } : c))
     } catch (e) {
       setError(String(e.message || e))
-    } finally {
-      setBusy(false)
-    }
+    } finally { setBusy(false) }
   }, [callLLM])
 
-  // --- G / A ---
   const onSelection = useCallback((kind, sel) => {
-    setLiveHighlight({ page: sel.page, rects: sel.rects }) // replaces any previous one
-    if (kind === 'annotate') {
-      const note = prompt(`Annotate (page ${sel.page}):\n\n"${sel.text.slice(0, 160)}"`)
-      if (!note) return
-      setAnnotations((a) => [...a, { id: crypto.randomUUID(), ...sel, note, at: Date.now() }])
+    if (kind === 'highlight') {
+      const color = settingsRef.current.highlightColor || 'yellow'
+      setHighlights((h) => [...h, { id: crypto.randomUUID(), ...sel, color }])
       return
     }
+    setSelHighlight({ page: sel.page, rects: sel.rects })
+    if (kind === 'annotate') { setNoteDraft(''); setModal({ kind: 'note', sel }); return }
     if (!doc) return
     if (sel.page < range[0] || sel.page > range[1]) {
-      setError(`Page ${sel.page} is outside the context range (${range[0]}–${range[1]}). Widen it first.`)
+      setError(`Page ${sel.page} is outside the context range (${range[0]}–${range[1]}).`)
       return
     }
     const hit = store.findExistingChat(chatsRef.current, sel.text)
-    if (hit) { setThreadId(hit.id); setFocus(false); return }
-
+    if (hit) { setThreadId(hit.id); setNotesOpen(false); setThreadsOpen(false); setFocus(false); return }
     const id = crypto.randomUUID()
     setChats((cs) => [...cs, {
       id, page: sel.page, selection: sel.text, rects: sel.rects,
       mode: 'technical', customInstruction: '', messages: [],
     }])
-    setThreadId(id)
-    setNotesOpen(false)
-    setFocus(false)
-    // Armed, not sent: the user picks a mode first, then Enter/Send fires it.
+    setThreadId(id); setNotesOpen(false); setThreadsOpen(false); setFocus(false); setChatCollapsed(false)
   }, [doc, range])
 
-  // Mode clicks only arm the mode — nothing is sent until Enter/Ask.
   const onSetMode = useCallback((id, mode, custom) => {
     setChats((cs) => cs.map((c) => c.id === id
       ? { ...c, mode, customInstruction: custom ?? c.customInstruction } : c))
   }, [])
 
-  // --- resizable chat ---
+  const ask = (id, text) => {
+    if (id === null) {
+      if (!text) return
+      const nid = crypto.randomUUID()
+      setChats((cs) => [...cs, {
+        id: nid, page: 0, selection: '', rects: [],
+        mode: 'custom', customInstruction: '', messages: [], title: 'General',
+      }])
+      setThreadId(nid)
+      setTimeout(() => runTurn(nid, text, text), 0)
+      return
+    }
+    const chat = chatsRef.current.find((c) => c.id === id)
+    if (!chat) return
+    if (!chat.selection) { if (text) runTurn(id, text, text); return }
+    const label = MODES.find((m) => m.id === chat.mode).label
+    const base = buildUserTurn({
+      selection: chat.selection, mode: chat.mode, page: chat.page,
+      customInstruction: chat.customInstruction,
+    })
+    if (!text) {
+      const verb = chat.messages.length ? 'Re-explain' : 'Explain'
+      runTurn(id, base, `${verb} this passage. (${label})`)
+    } else if (chat.messages.length === 0) {
+      runTurn(id, base + '\n\nADDITIONALLY: ' + text, `Explain this passage. (${label}) — ${text}`)
+    } else {
+      runTurn(id, text, text)
+    }
+  }
+
   const startResize = (e) => {
     e.preventDefault()
     const move = (ev) => {
-      const w = Math.min(720, Math.max(300, window.innerWidth - ev.clientX))
+      const w = Math.min(760, Math.max(320, window.innerWidth - ev.clientX))
       setSettings((s) => ({ ...s, chatWidth: w }))
     }
     const up = () => {
@@ -199,21 +232,30 @@ export default function App() {
     window.addEventListener('mouseup', up)
   }
 
-  // Esc closes settings; E exits focus.
   useEffect(() => {
     const onKey = (e) => {
       const t = document.activeElement?.tagName
-      if (t === 'INPUT' || t === 'TEXTAREA') return
-      if (e.key === 'Escape') { setSettingsOpen(false); setFocus(false) }
-      if (focus && e.key.toLowerCase() === 'e') setFocus(false)
+      if (t === 'INPUT' || t === 'TEXTAREA' || modal) return
+      if (e.key === 'Escape') { setSettingsOpen(false); setFocus(false); setPop(null) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [focus])
+  }, [modal])
 
   const activeFile = pending || filesRef.current.get(activeId)
-  const hasPaper = !!activeFile
+  const hasPaper = !!activeFile && !showLibrary
   const bump = (d) => setZoom((z) => clampZoom(z + d))
+  const popAt = (key, rect) => setPop((p) => (p?.key === key ? null : { key, rect }))
+
+  // Everything painted on the page: saved highlights + the transient selection.
+  const paint = useMemo(() => {
+    const hs = highlights.map((h) => ({
+      page: h.page, rects: h.rects, color: h.color, kind: 'saved',
+      onRemove: () => setHighlights((all) => all.filter((x) => x.id !== h.id)),
+    }))
+    if (selHighlight) hs.push({ ...selHighlight, kind: 'sel' })
+    return hs
+  }, [highlights, selHighlight])
 
   return (
     <div
@@ -225,144 +267,187 @@ export default function App() {
         openFile([...e.dataTransfer.files].find((f) => f.type === 'application/pdf'))
       }}
     >
-      <input
-        ref={fileInput} type="file" accept="application/pdf" hidden
-        onChange={(e) => { openFile(e.target.files[0]); e.target.value = '' }}
-      />
+      <input ref={fileInput} type="file" accept="application/pdf" hidden
+        onChange={(e) => { openFile(e.target.files[0]); e.target.value = '' }} />
 
-      <Rail
-        library={library}
-        activeId={activeId}
-        onPick={pickPaper}
-        onAdd={() => fileInput.current?.click()}
-        paperDark={settings.paperDark}
-        onToggleDark={() => setSettings({ ...settings, paperDark: !settings.paperDark })}
-        onFocus={() => setFocus((f) => !f)}
-        onSettings={() => setSettingsOpen(true)}
-        onNotes={() => { setNotesOpen((n) => !n); setFocus(false) }}
-        notesOn={notesOpen}
-        hasPaper={hasPaper}
-      />
+      {!focus && (
+        <Rail
+          library={library} activeId={activeId} onPick={openPaper}
+          onAdd={() => fileInput.current?.click()}
+          onLibrary={backToLibrary}
+          paperDark={settings.paperDark}
+          onToggleDark={() => setSettings({ ...settings, paperDark: !settings.paperDark })}
+          onFocus={() => setFocus(true)}
+          onSettings={() => setSettingsOpen(true)}
+          onNotes={() => { setNotesOpen((v) => !v); setThreadsOpen(false); setChatCollapsed(false) }}
+          notesOn={notesOpen}
+          onThreads={() => { setThreadsOpen((v) => !v); setNotesOpen(false); setChatCollapsed(false) }}
+          threadsOn={threadsOpen}
+          onHighlighter={() => {}}
+          highlighterOn={pop?.key === 'highlight'}
+          onContext={() => {}}
+          contextLocked={locked}
+          hasPaper={!!activeFile && !showLibrary}
+          popRef={popAt}
+        />
+      )}
 
       <div className="stage">
-        {!hasPaper ? (
-          <div className={'drop' + (dragging ? ' over' : '')}>
-            <div className="drop-in">
-              <h1>Lattice Reader</h1>
-              <p>Ask one thing at a time. How you want it.</p>
-              <button className="cta" onClick={() => fileInput.current?.click()}>
-                {pending ? 'Opening…' : 'Choose a PDF'}
-              </button>
+        {showLibrary || !activeFile ? (
+          library.length === 0 ? (
+            <div className={'drop' + (dragging ? ' over' : '')}>
+              <div className="drop-in">
+                <h1>Lattice Reader</h1>
+                <p>Ask one thing at a time. How you want it.</p>
+                <button className="cta" onClick={() => fileInput.current?.click()}>
+                  {pending ? 'Opening…' : 'Add paper'}
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+          <Library
+            library={library} activeId={activeId} dragging={dragging}
+            onOpen={openPaper} onDelete={deletePaper}
+            onAdd={() => fileInput.current?.click()}
+          />
+          )
         ) : (
-          <>
-            <div className="topbar">
-              {!doc ? (
-                <span className="focus-hint">reading paper…</span>
-              ) : focus ? (
-                <>
-                  <span className="focus-hint">press <kbd>E</kbd> to exit focus mode</span>
-                  <div className="zoomer">
-                    <button onClick={() => bump(-0.15)}>−</button>
-                    <span>{Math.round(zoom * 100)}%</span>
-                    <button onClick={() => bump(0.15)}>+</button>
-                  </div>
-                </>
-              ) : (
-                <RangeBar
-                  numPages={doc.numPages}
-                  range={range}
-                  locked={locked}
-                  onChange={changeRange}
-                  zoom={zoom}
-                  onZoom={bump}
-                />
+          <div className="split">
+            <div className="reader">
+              {!focus && (
+                <button className="reader-close" onClick={backToLibrary} title="Back to documents">
+                  <svg viewBox="0 0 20 20"><path d="M5 5l10 10M15 5L5 15" /></svg>
+                </button>
               )}
-            </div>
 
-            <div className="split">
               <PdfViewer
                 file={activeFile}
                 paperDark={settings.paperDark}
-                zoom={zoom}
-                setZoom={setZoom}
+                zoom={zoom} setZoom={setZoom}
                 onDocLoaded={onDocLoaded}
                 onSelection={onSelection}
-                liveHighlight={liveHighlight}
+                paint={paint}
               />
-              {!focus && (
-                <>
-                  <div className="grip" onMouseDown={startResize} />
-                  <div className="chat-slot" style={{ width: settings.chatWidth }}>
-                    <ChatPanel
-                      chats={chats}
-                      activeId={threadId}
-                      onSelectChat={setThreadId}
-                      onCloseChat={(id) => {
-                        setChats((cs) => cs.filter((c) => c.id !== id))
-                        if (threadId === id) setThreadId(null)
-                      }}
-                      onSetMode={onSetMode}
-                      onAsk={(id, text) => {
-                        if (id === null) {
-                          if (!text) return
-                          const nid = crypto.randomUUID()
-                          setChats((cs) => [...cs, {
-                            id: nid, page: 0, selection: '', rects: [],
-                            mode: 'custom', customInstruction: '', messages: [],
-                            title: 'General',
-                          }])
-                          setThreadId(nid)
-                          setTimeout(() => runTurn(nid, text, text), 0)
-                          return
-                        }
-                        const chat = chatsRef.current.find((c) => c.id === id)
-                        if (!chat) return
-                        if (!chat.selection && !text) return // general thread needs text
-                        if (!chat.selection && text) { runTurn(id, text, text); return }
-                        const label = MODES.find((m) => m.id === chat.mode).label
-                        if (!text) {
-                          // Empty Enter = (re)explain in the armed mode.
-                          const turn = buildUserTurn({
-                            selection: chat.selection, mode: chat.mode, page: chat.page,
-                            customInstruction: chat.customInstruction,
-                          })
-                          const verb = chat.messages.length ? 'Re-explain' : 'Explain'
-                          runTurn(id, turn, verb + ' this passage. (' + label + ')')
-                        } else if (chat.messages.length === 0) {
-                          const turn = buildUserTurn({
-                            selection: chat.selection, mode: chat.mode, page: chat.page,
-                            customInstruction: chat.customInstruction,
-                          }) + '\n\nADDITIONALLY: ' + text
-                          runTurn(id, turn, 'Explain this passage. (' + label + ') — ' + text)
-                        } else {
-                          runTurn(id, text, text)
-                        }
-                      }}
-                      onEditSelection={(id, text) =>
-                        setChats((cs) => cs.map((c) => c.id === id ? { ...c, selection: text } : c))}
-                      busy={busy}
-                      error={error}
-                      annotations={annotations}
-                      onDeleteNote={(id) => setAnnotations((a) => a.filter((n) => n.id !== id))}
-                      onJumpToNote={(a) => scrollToRect(a.page, a.rects && a.rects[0])}
-                      notesOpen={notesOpen}
-                      setNotesOpen={setNotesOpen}
-                    />
-                  </div>
-                </>
+
+              <div className="zoomer vert">
+                <button onClick={() => bump(0.15)} title="Zoom in">+</button>
+                <span>{Math.round(zoom * 100)}%</span>
+                <button onClick={() => bump(-0.15)} title="Zoom out">−</button>
+              </div>
+
+              {focus && (
+                <button className="focus-exit" onClick={() => setFocus(false)} title="Exit focus mode">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M4 9h5V4M20 9h-5V4M4 15h5v5M20 15h-5v5" />
+                  </svg>
+                </button>
               )}
             </div>
-          </>
+
+            {!focus && !chatCollapsed && (
+              <>
+                <div className="grip" onMouseDown={startResize} />
+                <div className="chat-slot" style={{ width: settings.chatWidth }}>
+                  <ChatPanel
+                    chats={chats} activeId={threadId}
+                    onSelectChat={(id) => { setThreadId(id); setNotesOpen(false); setThreadsOpen(false) }}
+                    onCloseChat={(id) => {
+                      setChats((cs) => cs.filter((c) => c.id !== id))
+                      if (threadId === id) setThreadId(null)
+                    }}
+                    onSetMode={onSetMode}
+                    onAsk={ask}
+                    onEditSelection={(id, text) =>
+                      setChats((cs) => cs.map((c) => c.id === id ? { ...c, selection: text } : c))}
+                    busy={busy} error={error}
+                    annotations={annotations}
+                    onDeleteNote={(id) => {
+                      setAnnotations((a) => a.filter((n) => n.id !== id))
+                      setSelHighlight(null) // clear its highlight immediately
+                    }}
+                    onJumpToNote={(a) => {
+                      setSelHighlight({ page: a.page, rects: a.rects })
+                      scrollToRect(a.page, a.rects && a.rects[0])
+                    }}
+                    onBlurNote={() => setSelHighlight(null)}
+                    notesOpen={notesOpen} setNotesOpen={setNotesOpen}
+                    listOpen={threadsOpen} setListOpen={setThreadsOpen}
+                    onCollapse={() => setChatCollapsed(true)}
+                  />
+                </div>
+              </>
+            )}
+
+            {!focus && chatCollapsed && (
+              <button className="chat-stub" onClick={() => setChatCollapsed(false)} title="Expand chat">
+                <svg viewBox="0 0 20 20"><path d="M12 4L6 10l6 6" /></svg>
+              </button>
+            )}
+          </div>
         )}
       </div>
 
+      {/* --- rail popovers --- */}
+      <Popover open={pop?.key === 'highlight'} anchorRect={pop?.rect}
+        onClose={() => setPop(null)} title="Highlight colour">
+        <div className="swatch-list">
+          {HIGHLIGHT_COLORS.map((c) => (
+            <button
+              key={c.id}
+              className={'swatch-row' + (settings.highlightColor === c.id ? ' on' : '')}
+              onClick={() => { setSettings({ ...settings, highlightColor: c.id }); setPop(null) }}
+            >
+              <i style={{ '--ink-color': c.css }} />
+              {c.name}
+            </button>
+          ))}
+        </div>
+        <p className="pop-note">Select text and press <kbd>H</kbd>. Right-click a highlight to remove it.</p>
+      </Popover>
+
+      <Popover open={pop?.key === 'context' && !!doc} anchorRect={pop?.rect}
+        onClose={() => setPop(null)} title="Context pages">
+        <p className="pop-note">Only these pages are sent to the model.</p>
+        {doc && (
+          <RangeBar numPages={doc.numPages} range={range} locked={locked} onChange={setRange} />
+        )}
+      </Popover>
+
+      {/* --- modals --- */}
+      <Modal
+        open={modal?.kind === 'delete'}
+        title="Delete document?"
+        body={<>Remove “{modal?.name}” from the Reader?<br /><br />All threads will be lost.</>}
+        confirmLabel="Delete" danger
+        onConfirm={() => modal.onOk()} onCancel={() => setModal(null)}
+      />
+      <Modal
+        open={modal?.kind === 'note'}
+        title={'Annotate page ' + (modal?.sel?.page ?? '')}
+        body={modal?.sel?.text.replace(/\s+/g, ' ').slice(0, 180)}
+        confirmLabel="Save note" input
+        inputValue={noteDraft} onInputChange={setNoteDraft}
+        onConfirm={() => {
+          if (noteDraft.trim()) {
+            setAnnotations((a) => [...a, {
+              id: crypto.randomUUID(), ...modal.sel, note: noteDraft.trim(), at: Date.now(),
+            }])
+          }
+          setModal(null); setSelHighlight(null)
+        }}
+        onCancel={() => { setModal(null); setSelHighlight(null) }}
+      />
+      <Modal
+        open={modal?.kind === 'missing'}
+        title="File not loaded"
+        body={<>“{modal?.name}” isn’t open in this tab.<br /><br />Pick the file again — its threads are still saved.</>}
+        confirmLabel="Choose file"
+        onConfirm={() => modal.onOk()} onCancel={() => setModal(null)}
+      />
+
       <Settings
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        settings={settings}
-        setSettings={setSettings}
+        open={settingsOpen} onClose={() => setSettingsOpen(false)}
+        settings={settings} setSettings={setSettings}
         usage={usage}
         onResetUsage={() => { store.resetUsage(); setUsage(store.loadUsage()) }}
       />

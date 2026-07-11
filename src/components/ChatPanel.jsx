@@ -1,17 +1,31 @@
 import { useEffect, useRef, useState } from 'react'
 import { MODES } from '../lib/modes'
+import Markdown from './Markdown'
 
 export default function ChatPanel({
   chats, activeId, onSelectChat, onCloseChat, onSetMode, onAsk, onEditSelection,
   busy, error, annotations, onDeleteNote, onJumpToNote, notesOpen, setNotesOpen,
+  listOpen, setListOpen, onCollapse, onBlurNote,
 }) {
   const chat = chats.find((c) => c.id === activeId)
   const [draft, setDraft] = useState('')
   const [custom, setCustom] = useState('')
-  const [listOpen, setListOpen] = useState(false)
+  const [selNote, setSelNote] = useState(null)
   const endRef = useRef(null)
 
-  useEffect(() => { setCustom(chat?.customInstruction || ''); setListOpen(false) }, [activeId])
+  useEffect(() => { setCustom(chat?.customInstruction || '') }, [activeId])
+  useEffect(() => { if (!notesOpen && selNote) { setSelNote(null); onBlurNote?.() } }, [notesOpen])
+  // Clicking anywhere that isn't a note card deselects the current annotation.
+  useEffect(() => {
+    if (!selNote) return
+    const onDown = (e) => {
+      if (e.target.closest?.('.note-card')) return
+      setSelNote(null)
+      onBlurNote?.()
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [selNote, onBlurNote])
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chat?.messages.length, busy])
 
   const started = chat && chat.messages.length > 0
@@ -61,6 +75,9 @@ export default function ChatPanel({
             {chat.selection ? 'p' + chat.page + ' · ' + snippet(chat.selection, 30) : (chat.title || 'General')}
           </span>
         )}
+        <button className="collapse" onClick={onCollapse} title="Collapse panel">
+          <svg viewBox="0 0 20 20"><path d="M8 4l6 6-6 6" /></svg>
+        </button>
       </header>
 
       {notesOpen ? (
@@ -71,12 +88,23 @@ export default function ChatPanel({
             </div>
           )}
           {annotations.map((a) => (
-            <div className="note-card" key={a.id} onClick={() => onJumpToNote(a)}>
+            <div
+              className={'note-card' + (selNote === a.id ? ' on' : '')}
+              key={a.id}
+              onClick={() => {
+                if (selNote === a.id) { setSelNote(null); onBlurNote() }
+                else { setSelNote(a.id); onJumpToNote(a) }
+              }}
+            >
               <div className="note-src">
                 <span className="titem-pg">p{a.page}</span> {snippet(a.text, 100)}
               </div>
               <div className="note-body">{a.note}</div>
-              <button className="note-del" onClick={(e) => { e.stopPropagation(); onDeleteNote(a.id) }}>delete</button>
+              <button className="note-del" onClick={(e) => {
+                e.stopPropagation()
+                if (selNote === a.id) setSelNote(null)
+                onDeleteNote(a.id)
+              }}>delete</button>
             </div>
           ))}
         </div>
@@ -160,7 +188,9 @@ export default function ChatPanel({
             )}
             {chat.messages.map((m, i) => (
               <div key={i} className={'msg ' + m.role}>
-                {m.role === 'user' && m.display ? m.display : m.content}
+                {m.role === 'assistant'
+                  ? <Markdown text={m.content} />
+                  : (m.display || m.content)}
               </div>
             ))}
             {busy && <div className="msg assistant pending">Thinking…</div>}

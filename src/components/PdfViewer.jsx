@@ -66,7 +66,7 @@ export function extractInReadingOrder(items, pageWidth) {
 }
 
 export default function PdfViewer({
-  file, paperDark, zoom, setZoom, onDocLoaded, onSelection, liveHighlight,
+  file, paperDark, zoom, setZoom, onDocLoaded, onSelection, paint,
 }) {
   const scrollRef = useRef(null)
   const hostRef = useRef(null)
@@ -252,33 +252,61 @@ export default function PdfViewer({
       const t = document.activeElement?.tagName
       if (t === 'INPUT' || t === 'TEXTAREA') return
       const k = e.key.toLowerCase()
-      if (k !== 'g' && k !== 'a') return
+      if (k !== 'g' && k !== 'a' && k !== 'h') return
       const s = capture()
       if (!s) return
       e.preventDefault()
-      onSelection(k === 'g' ? 'explain' : 'annotate', s)
+      onSelection(k === 'g' ? 'explain' : k === 'a' ? 'annotate' : 'highlight', s)
       window.getSelection()?.removeAllRanges()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [capture, onSelection])
 
-  // ---- ONE live highlight, nothing persistent ----
+  // ---- paint saved highlights + the transient selection ----
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
     host.querySelectorAll('.hl').forEach((n) => n.remove())
-    if (!rendered || !liveHighlight) return
-    const pageEl = host.querySelector('.page[data-page="' + liveHighlight.page + '"]')
-    if (!pageEl) return
-    for (const r of liveHighlight.rects || []) {
-      const box = document.createElement('div')
-      box.className = 'hl'
-      box.style.cssText =
-        'left:' + r.x * 100 + '%;top:' + r.y * 100 + '%;width:' + r.w * 100 + '%;height:' + r.h * 100 + '%'
-      pageEl.appendChild(box)
+    if (!rendered) return
+    for (const h of paint || []) {
+      const pageEl = host.querySelector('.page[data-page="' + h.page + '"]')
+      if (!pageEl) continue
+      for (const r of h.rects || []) {
+        const box = document.createElement('div')
+        box.className = 'hl hl-' + h.kind + (h.color ? ' c-' + h.color : '')
+        box.style.cssText =
+          'left:' + r.x * 100 + '%;top:' + r.y * 100 + '%;width:' + r.w * 100 + '%;height:' + r.h * 100 + '%'
+        pageEl.appendChild(box)
+      }
     }
-  }, [liveHighlight, rendered])
+  }, [paint, rendered])
+
+  // Right-click inside any saved highlight removes that whole chunk. Hit-testing
+  // here (rather than on the highlight divs) because the text layer sits above
+  // them and would swallow every pointer event.
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+    const onCtx = (e) => {
+      const pageEl = e.target.closest?.('.page')
+      if (!pageEl) return
+      const page = Number(pageEl.dataset.page)
+      const r = pageEl.getBoundingClientRect()
+      const px = (e.clientX - r.left) / r.width
+      const py = (e.clientY - r.top) / r.height
+      const hit = (paint || []).find((h) =>
+        h.kind === 'saved' && h.page === page &&
+        (h.rects || []).some((q) =>
+          px >= q.x - 0.004 && px <= q.x + q.w + 0.004 &&
+          py >= q.y - 0.004 && py <= q.y + q.h + 0.004))
+      if (!hit) return
+      e.preventDefault()
+      hit.onRemove?.()
+    }
+    host.addEventListener('contextmenu', onCtx)
+    return () => host.removeEventListener('contextmenu', onCtx)
+  }, [paint])
 
   return (
     <div className={'viewer' + (paperDark ? ' paper-dark' : '')} ref={scrollRef}>

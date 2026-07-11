@@ -2,9 +2,9 @@
 
 *Ask one thing at a time. How you want it.*
 
-Select a passage, press **G**, get an explanation of *that passage only* — with the paper as context. Press **A** to annotate.
+Select a passage, press **G**, get an explanation of *that passage only* , with the paper as context. Press **A** to annotate.
 
-No backend. The PDF never leaves the tab. Keys and sessions sit in localStorage.
+No backend. The PDF or API Keys never leaves the tab. Keys and sessions sit in localStorage.
 
 ## Run
 ```bash
