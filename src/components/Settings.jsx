@@ -47,7 +47,7 @@ export default function Settings({ open, onClose, settings, setSettings, usage, 
             <label>API key</label>
             <input
               type="password"
-              placeholder="This does not leave your device"
+              placeholder=""
               value={settings.keys[settings.provider] || ''}
               onChange={(e) => set({ keys: { ...settings.keys, [settings.provider]: e.target.value } })}
             />

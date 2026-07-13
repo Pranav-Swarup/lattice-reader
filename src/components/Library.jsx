@@ -14,7 +14,7 @@ function when(ts) {
   return new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-export default function Library({ library, activeId, liveStats, inkColor, onOpen, onDelete, onRename, onAdd, dragging }) {
+export default function Library({ library, activeId, liveStats, onOpen, onDelete, onRename, onAdd, dragging }) {
   const [editing, setEditing] = useState(null)
   const [draft, setDraft] = useState('')
   const inputRef = useRef(null)
@@ -42,13 +42,7 @@ export default function Library({ library, activeId, liveStats, inkColor, onOpen
                 <div className="card-face">
                   <span className="card-n">{p.n}</span>
 
-                  <span
-                    className="card-title"
-                    style={{ color: inkColor }}
-                    title={clean(p.name)}
-                  >
-                    {clean(p.name)}
-                  </span>
+                  <span className="card-title" title={clean(p.name)}>{clean(p.name)}</span>
 
                   <div className="card-stats">
                     <div className="stat">

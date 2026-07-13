@@ -321,7 +321,6 @@ export default function App() {
           <Library
             library={library} activeId={activeId} dragging={dragging}
             liveStats={activeId ? { id: activeId, threads: chats.length, notes: annotations.length, highlights: highlights.length } : null}
-            inkColor={(HIGHLIGHT_COLORS.find((c) => c.id === settings.highlightColor) || HIGHLIGHT_COLORS[0]).solid}
             onOpen={openPaper} onDelete={deletePaper}
             onRename={(id, name) =>
               setLibrary((lib) => lib.map((x) => x.id === id ? { ...x, name } : x))}
@@ -457,14 +456,15 @@ export default function App() {
       />
       <Modal
         open={modal?.kind === 'missing'}
-        title="Pick the file again"
+        title={'Re-upload ' + (modal?.name || 'file')}
         body={<>
-          Lattice Reader has no backend server — documents are never uploaded anywhere, and a
-          browser cannot keep a PDF in local storage. So “{modal?.name}” has to be re-opened from
-          your disk each session.
-          <br /><br />
-          Nothing is lost: your threads, annotations, and highlights for this document are saved
-          and will reattach as soon as you pick it.
+          <ul className="modal-list">
+            <li>Lattice Reader runs as a static website tool. Nothing is uploaded to a server.</li>
+            <li><b>{modal?.name}</b> has to be re-opened from your device.</li>
+          </ul>
+          <span className="modal-fine">
+            (threads, annotations, and highlights are saved)
+          </span>
         </>}
         confirmLabel="Choose file"
         onConfirm={() => modal.onOk()} onCancel={() => setModal(null)}

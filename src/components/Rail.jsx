@@ -33,7 +33,10 @@ function Tip({ label, children, className, ...rest }) {
       {box && label && (
         <span
           className={'railtip' + (rest.disabled ? ' muted' : '')}
-          style={{ left: box.right + 12, top: box.top + box.height / 2 }}
+          style={{
+            left: box.right + 12,
+            top: Math.max(16, Math.min(box.top + box.height / 2, window.innerHeight - 16)),
+          }}
         >
           {label}
         </span>
@@ -97,7 +100,10 @@ function InvertControl({ paperDark, onToggleDark, disabled, activeFile }) {
       {open && box && (
         <div
           className="invert-fly"
-          style={{ left: box.right + 12, top: box.top + box.height / 2 }}
+          style={{
+            left: box.right + 12,
+            top: Math.max(90, Math.min(box.top + box.height / 2, window.innerHeight - 100)),
+          }}
           onMouseEnter={() => clearTimeout(timer.current)}
           onMouseLeave={hide}
         >

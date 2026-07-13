@@ -17,12 +17,13 @@ export default function Popover({ open, anchorRect, onClose, children, title }) 
   }, [open, onClose])
 
   if (!open || !anchorRect) return null
-  const top = Math.min(anchorRect.top, window.innerHeight - 220)
+  // Clamp so the panel can't run off the bottom of a short screen.
+  const top = Math.max(10, Math.min(anchorRect.top, window.innerHeight - 260))
   return (
     <div
       className="pop"
       ref={ref}
-      style={{ left: anchorRect.right + 10, top: Math.max(10, top) }}
+      style={{ left: anchorRect.right + 10, top }}
     >
       {title && <div className="pop-title">{title}</div>}
       {children}

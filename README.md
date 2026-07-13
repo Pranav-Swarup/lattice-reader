@@ -2,96 +2,12 @@
 
 **Ask one thing at a time. How you want it.**
 
-Lattice Reader is a document reader for people who read hard things slowly.
+Most AI reading tools summarize the whole document and throw it at you. But ideally you want to read through a paper, sit with one paragraph, understand *only that*, and read on. 
+Lattice Reader allows you to do that. The model knows the entire document, so it can tell you where a symbol was defined and how this bit connects to the argument. 
 
-Most AI reading tools summarize the whole document at you. That is the opposite of what you want when you are actually working through a paper — you want to sit with one paragraph, understand *that*, and move on. But you also want the model to know the rest of the document, so it can tell you where a symbol was defined, what the notation refers to, and how this bit connects to the argument.
-
-So: **select a snippet, press `G`, get an explanation of that snippet only — with the whole document as context.**
+**Simply select a snippet, press `G`, get an customized explanation of that snippet only with the whole document as context.**
 
 No account. No server. Your document never leaves the browser tab, and your API key never leaves your device.
-
----
-
-## How it works
-
-1. **Drop in a PDF.**
-2. **Select some text** — a sentence, a paragraph, a definition, an equation.
-3. **Press `G`.** A thread opens in the right-hand pane.
-4. **Pick how you want it explained** (Define / Basic / Technical / Custom).
-5. **Press `Enter`.**
-
-That's the loop. Everything else is in service of it.
-
----
-
-## Features
-
-### Two explanation modes
-
-Select a snippet, then choose the register. Nothing is sent until you hit Enter, so you can switch freely before committing.
-
-| Mode | What it does |
-|---|---|
-| **Basic** | Restates the snippet in plain English — the same claim, simplest wording that's still true — then gives the intuition underneath: what's really going on, why anyone would do it this way, what breaks if they don't. Reaches for analogies, examples, and parallels. Not condescending, just plain. |
-| **Define** | Skips explanation. Pulls out every technical term, symbol, and piece of jargon in the selection and defines each in one line, using the document's meaning where it has fixed one. |
-
-Already got an answer and want it re-framed? Switch modes and hit Enter again — the thread keeps its history.
-
-### Document mode ⇄ General mode
-
-A switch at the top of the chat pane. In **Document** mode (default) the document is sent as context and answers are grounded in it. Flip to **General** and the document is dropped from the prompt entirely — you get a normal assistant, mid-conversation, for when you need to ask something the paper has nothing to do with. Flip back and grounding resumes.
-
-### Editing the snippet
-
-PDF extraction breaks ligatures, splits hyphens, and interleaves columns. Click the snippet in a thread (before you send) to open a full editing panel and fix it — asking a model about garbled text is worse than useless.
-
-### Scoped context
-
-The **Context pages** control sends only part of the document to the model. A 60-page paper with 40 pages of appendices costs the same per question as its 8-page core — unless you scope it. Narrowing also sharpens answers, since the model isn't hunting through supplementary material.
-
-Locks once you open a thread, because changing it would invalidate every answer already given.
-
-### Threads
-
-Every snippet you ask about becomes its own thread, with full follow-up conversation. Select the same snippet (or a subset of one you've already asked about) and Lattice reopens the existing thread instead of spending another call.
-
-You can also just **ask a general question** about the document without selecting anything.
-
-### Highlighting and annotation
-
-- **`H`** — highlight the selection. Five muted inks. Right-click any highlight to remove the whole chunk.
-- **`A`** — annotate the selection. Notes live in a side panel; click one to jump to and highlight its location in the document.
-
-### Reading comfort
-
-- **Invert document** — flips the page to dark while leaving figures and photographs correct.
-- **Focus mode** — collapses everything but the document.
-- **Six themes** — three dark (Ember Study, Midnight Oil, Moss Cathedral), one mid-tone (Foggy Desk), two light (Paper Cut, Letterhead).
-- Resizable and collapsible chat pane; vertical zoom; `Ctrl`/`Cmd` + scroll to zoom.
-
-### Export an inverted PDF
-
-Hover the **invert** button to reveal a download action: it produces an inverted copy of the document you can keep, for reading in other apps at night.
-
-This is a rasterised export — every page is rendered to an image, inverted pixel by pixel (with a hue rotation, so figures stay their true colours rather than turning into negatives), and rebuilt into a new PDF. The output is therefore **image-only: no selectable text, no search, and a larger file**. That is inherent to doing it in the browser with no server. The on-screen invert, by contrast, is a live CSS filter and keeps text fully selectable.
-
-The same tool is the only thing offered on mobile, where the app otherwise shows a "best experienced on desktop" screen — the whole interaction is text selection and keyboard shortcuts.
-
-### Multi-document library
-
-Documents stack in a rail on the left, each with a **fully isolated session** — its own threads, annotations, highlights, and page range. Rename or delete them from the library screen.
-
-### Bring your own key
-
-| Provider | Notes |
-|---|---|
-| **Google Gemini** | **Has a free tier.** No credit card. The default. |
-| **Anthropic Claude** | Supports prompt caching — see below. |
-| **OpenAI** | GPT-4o and friends. |
-| **OpenRouter** | One key, many models. |
-| **Ollama** | Fully local, fully free. Localhost only. |
-
-Keys are stored in your browser's localStorage and are sent to the provider and nowhere else. There is no backend to send them to.
 
 ---
 
@@ -107,6 +23,61 @@ Keys are stored in your browser's localStorage and are sent to the provider and 
 | `Ctrl`/`Cmd` + scroll | Zoom the document |
 | `Esc` | Close panels / exit focus mode |
 
+
+---
+
+## Features
+
+### Explanation modes
+
+Select a snippet, then choose the register. Nothing is sent until you hit Enter, so you can switch freely before committing.
+
+| Mode | What it does |
+|---|---|
+| **Basic** | Restates the snippet in plain English — the same claim, simplest wording that's still true. Analogies, examples, and parallels. |
+| **Define** | Pulls out every technical term, symbol, and piece of jargon in the selection and defines each, keeping in mind the document's context. |
+
+Already got an answer and want it re-framed? Switch modes and hit Enter again.
+
+### Invert PDF colors to Dark Mode
+
+- **Invert document** flips the pages to dark while leaving figures and photographs correct. Can be downloaded.
+- **Six Reading themes**
+- **Focus mode**
+
+### Scoped context
+
+A 30-page paper with 10 pages of appendices is a waste of tokens. Narrowing it can be done with the **Context Pages** option and sharpens answers.
+
+### Threads
+
+Every snippet you ask about becomes its own thread, with full follow-up conversation. You can also ask **a general question** without selecting anything.
+
+### Document mode ⇄ General mode
+
+A switch at the top of the chat pane. In **Document** mode (default) the document is sent as context and answers are grounded in it. Flip to **General** and the document is dropped from the prompt entirely, you get a normal assistant, mid-conversation.
+
+### Highlighting and annotation
+
+- **`H`** highlights the selection. Five muted inks. Right-click any highlight to remove.
+- **`A`** annotates the selection. Notes live in a side panel.
+
+### Multi-document library
+
+Documents stack in a rail on the left, each with a **fully isolated session**.
+
+### BYOK - Bring your own API Key
+
+| Provider | Notes |
+|---|---|
+| **Google Gemini** | **Has a free tier.** No credit card. The default recommended. |
+| **Anthropic Claude** | Supports prompt caching — see below. |
+| **OpenAI** | GPT-4o. |
+| **OpenRouter** | One key, many models. |
+| **Ollama** | Fully local, fully free. Localhost only. |
+
+The whole app is static files. Your API Keys are safe!
+
 ---
 
 ## Getting an API key
@@ -116,11 +87,13 @@ The in-app guide (**Settings → How do I get an API key?**) walks through all p
 1. Go to **[aistudio.google.com/apikey](https://aistudio.google.com/apikey)**
 2. Sign in with any Google account
 3. Click **Create API key**
-4. Copy the `AIza…` value into Settings
+4. Copy the `KEY98ASASUA8-2………` value into Settings
 
-No billing, no credit card. Rate-limited but generous enough for steady reading. `gemini-3.1-flash-lite` is the default and is the cheapest and fastest option.
+Free. But generous enough for steady reading. `gemini-3.1-flash-lite` is the default and is the cheapest and fastest option.
 
 ---
+
+# For Developers
 
 ## Running it
 
@@ -159,6 +132,7 @@ A few decisions worth knowing if you plan to modify this.
 
 ## Known limits
 
+- No server of ours ever sees your key, because there is no server. But anything in browser storage is readable by any script on the page and persists until cleared — true of every bring-your-own-key tool. If using a paid key, use a revocable key with a spend cap (Gemini's free tier needs no billing at all).
 - Math renders as inline code, not typeset. No KaTeX yet — it would drop into `Markdown.jsx` in about ten lines.
 - Thread reuse is substring-based, not geometric — it won't catch a selection straddling two existing threads.
 - Documents with three or more columns fall back to naive extraction.
@@ -166,4 +140,3 @@ A few decisions worth knowing if you plan to modify this.
 
 ---
 
-Made by Pranav.

@@ -61,6 +61,28 @@ export default function SetupGuide({ open, onClose }) {
           </section>
         </div>
 
+        <section className="guide-faq">
+          <h4>Is it safe to put my key here?</h4>
+          <p>
+            The key is stored in this browser and sent only to the provider you picked. There is no
+            backend — no server of ours ever sees it, because there is no server. The whole app is
+            static files.
+          </p>
+          <p>
+            The honest caveat: anything stored in a browser is readable by any script running on
+            the same page, and it persists until you clear it. That is true of every
+            bring-your-own-key tool. So the sensible habit is the one that costs you nothing:
+          </p>
+          <ul>
+            <li>Use a key you can revoke in one click, not one shared across a team.</li>
+            <li>Set a spend cap on it. Gemini's free tier needs no billing at all.</li>
+            <li>On a shared or public machine, clear the key when you're done.</li>
+          </ul>
+          <p className="guide-note">
+            Your documents are never uploaded anywhere. They are read in the browser and stay there.
+          </p>
+        </section>
+
         <div className="modal-actions">
           <button className="primary" onClick={onClose}>Got it</button>
         </div>
