@@ -1,11 +1,13 @@
 # Lattice Reader
-
 **Ask one thing at a time. How you want it.**
+
+Access the tool at [Lattice Reader](https://pranav-swarup.github.io/lattice-reader/)
 
 Most AI reading tools summarize the whole document and throw it at you. But ideally you want to sit with one paragraph, understand *only that* with context of the whole document.
 
+### Intuition Mode
 ![Intuition Mode](imgs/Demo1.png)
-
+### Define Mode
 ![Define Mode](imgs/Demo2.png)
 
 ---
