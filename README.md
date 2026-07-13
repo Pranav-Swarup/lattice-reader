@@ -2,12 +2,11 @@
 
 **Ask one thing at a time. How you want it.**
 
-Most AI reading tools summarize the whole document and throw it at you. But ideally you want to read through a paper, sit with one paragraph, understand *only that*, and read on. 
-Lattice Reader allows you to do that. The model knows the entire document, so it can tell you where a symbol was defined and how this bit connects to the argument. 
+Most AI reading tools summarize the whole document and throw it at you. But ideally you want to sit with one paragraph, understand *only that* with context of the whole document.
 
-**Simply select a snippet, press `G`, get an customized explanation of that snippet only with the whole document as context.**
+![Intuition Mode](imgs/Demo1.png)
 
-No account. No server. Your document never leaves the browser tab, and your API key never leaves your device.
+![Define Mode](imgs/Demo2.png)
 
 ---
 
