@@ -90,11 +90,11 @@ export const THEMES = [
 
 // Muted, chalky inks — closer to a real highlighter on paper than neon.
 export const HIGHLIGHT_COLORS = [
-  { id: 'butter', name: 'Butter', css: 'rgba(232, 208, 122, .40)' },
-  { id: 'sky',    name: 'Sky',    css: 'rgba(150, 186, 222, .40)' },
-  { id: 'sage',   name: 'Sage',   css: 'rgba(157, 200, 168, .40)' },
-  { id: 'rose',   name: 'Rose',   css: 'rgba(226, 165, 186, .40)' },
-  { id: 'clay',   name: 'Clay',   css: 'rgba(226, 172, 136, .42)' },
+  { id: 'butter', name: 'Butter', css: 'rgba(232, 208, 122, .40)', solid: '#d9bf6b' },
+  { id: 'sky',    name: 'Sky',    css: 'rgba(150, 186, 222, .40)', solid: '#7fa8d4' },
+  { id: 'sage',   name: 'Sage',   css: 'rgba(157, 200, 168, .40)', solid: '#84bb98' },
+  { id: 'rose',   name: 'Rose',   css: 'rgba(226, 165, 186, .40)', solid: '#d68fa8' },
+  { id: 'clay',   name: 'Clay',   css: 'rgba(226, 172, 136, .42)', solid: '#d6996d' },
 ]
 
 export function applyTheme(id) {

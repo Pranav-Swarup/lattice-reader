@@ -26,18 +26,24 @@ That's the loop. Everything else is in service of it.
 
 ## Features
 
-### Four explanation modes
+### Two explanation modes
 
-Select a snippet, then choose the register you want. Nothing is sent until you hit Enter, so you can switch modes freely before committing.
+Select a snippet, then choose the register. Nothing is sent until you hit Enter, so you can switch freely before committing.
 
 | Mode | What it does |
 |---|---|
-| **Define** | Skips explanation entirely. Pulls out every technical term, symbol, and piece of jargon in your selection and defines each in one line — using *the document's* meaning, not the generic one. |
-| **Basic** | Assumes you know nothing about the subfield. Teaches the underlying idea from the ground up, with an analogy, before touching the snippet. |
-| **Technical** | Assumes you know the area but haven't read this document. Skips background, goes straight to what the snippet is doing, what the notation means, and what it's quietly assuming. |
-| **Custom** | Your own standing instruction, appended to every message in that thread. *"Relate this to reinforcement learning."* *"Always give me the intuition before the math."* |
+| **Basic** | Restates the snippet in plain English — the same claim, simplest wording that's still true — then gives the intuition underneath: what's really going on, why anyone would do it this way, what breaks if they don't. Reaches for analogies, examples, and parallels. Not condescending, just plain. |
+| **Define** | Skips explanation. Pulls out every technical term, symbol, and piece of jargon in the selection and defines each in one line, using the document's meaning where it has fixed one. |
 
 Already got an answer and want it re-framed? Switch modes and hit Enter again — the thread keeps its history.
+
+### Document mode ⇄ General mode
+
+A switch at the top of the chat pane. In **Document** mode (default) the document is sent as context and answers are grounded in it. Flip to **General** and the document is dropped from the prompt entirely — you get a normal assistant, mid-conversation, for when you need to ask something the paper has nothing to do with. Flip back and grounding resumes.
+
+### Editing the snippet
+
+PDF extraction breaks ligatures, splits hyphens, and interleaves columns. Click the snippet in a thread (before you send) to open a full editing panel and fix it — asking a model about garbled text is worse than useless.
 
 ### Scoped context
 
@@ -51,10 +57,6 @@ Every snippet you ask about becomes its own thread, with full follow-up conversa
 
 You can also just **ask a general question** about the document without selecting anything.
 
-### Editable selections
-
-PDF text extraction is imperfect — ligatures break, hyphens split, columns interleave. The selected text is **editable** in the chat pane before you send it, so you can fix garbled extraction rather than asking the model about nonsense.
-
 ### Highlighting and annotation
 
 - **`H`** — highlight the selection. Five muted inks. Right-click any highlight to remove the whole chunk.
@@ -66,6 +68,14 @@ PDF text extraction is imperfect — ligatures break, hyphens split, columns int
 - **Focus mode** — collapses everything but the document.
 - **Six themes** — three dark (Ember Study, Midnight Oil, Moss Cathedral), one mid-tone (Foggy Desk), two light (Paper Cut, Letterhead).
 - Resizable and collapsible chat pane; vertical zoom; `Ctrl`/`Cmd` + scroll to zoom.
+
+### Export an inverted PDF
+
+Hover the **invert** button to reveal a download action: it produces an inverted copy of the document you can keep, for reading in other apps at night.
+
+This is a rasterised export — every page is rendered to an image, inverted pixel by pixel (with a hue rotation, so figures stay their true colours rather than turning into negatives), and rebuilt into a new PDF. The output is therefore **image-only: no selectable text, no search, and a larger file**. That is inherent to doing it in the browser with no server. The on-screen invert, by contrast, is a live CSS filter and keeps text fully selectable.
+
+The same tool is the only thing offered on mobile, where the app otherwise shows a "best experienced on desktop" screen — the whole interaction is text selection and keyboard shortcuts.
 
 ### Multi-document library
 

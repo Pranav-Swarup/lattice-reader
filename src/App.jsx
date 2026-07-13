@@ -7,12 +7,24 @@ import RangeBar from './components/RangeBar'
 import Modal from './components/Modal'
 import Popover from './components/Popover'
 import Library from './components/Library'
+import MobileGate from './components/MobileGate'
 import { PROVIDERS } from './lib/llm'
-import { BASE_SYSTEM, buildUserTurn, MODES } from './lib/modes'
+import { BASE_SYSTEM, GENERAL_SYSTEM, buildUserTurn, MODES } from './lib/modes'
 import { applyTheme, HIGHLIGHT_COLORS } from './lib/themes'
 import * as store from './lib/store'
 
+// Desktop-only by design: the whole interaction is select-text + keyboard.
+function isMobile() {
+  return window.matchMedia('(max-width: 820px), (pointer: coarse)').matches
+}
+
 export default function App() {
+  const [mobile, setMobile] = useState(isMobile)
+  useEffect(() => {
+    const on = () => setMobile(isMobile())
+    window.addEventListener('resize', on)
+    return () => window.removeEventListener('resize', on)
+  }, [])
   const [settings, setSettings] = useState(store.loadSettings)
   const [usage, setUsage] = useState(store.loadUsage)
   const [library, setLibrary] = useState(store.loadLibrary)
@@ -37,6 +49,7 @@ export default function App() {
   const [notesOpen, setNotesOpen] = useState(false)
   const [threadsOpen, setThreadsOpen] = useState(false)
   const [chatCollapsed, setChatCollapsed] = useState(false)
+  const [general, setGeneral] = useState(false)
   const [dragging, setDragging] = useState(false)
 
   const [selHighlight, setSelHighlight] = useState(null) // transient (G / note focus)
@@ -70,6 +83,7 @@ export default function App() {
     setLibrary((lib) => lib.some((p) => p.id === id)
       ? lib
       : [...lib, { id, n: lib.length + 1, name: file.name, addedAt: Date.now() }])
+    setLibrary((lib) => lib.map((x) => x.id === id ? { ...x, openedAt: Date.now() } : x))
     const saved = store.loadDoc(id)
     setActiveId(id)
     setChats(saved.chats)
@@ -129,7 +143,7 @@ export default function App() {
     if (settings.provider !== 'ollama' && !key) throw new Error('Add an API key in Settings first.')
     const r = await prov.send({
       apiKey: key, model: settings.model,
-      system: BASE_SYSTEM(contextText, range),
+      system: general ? GENERAL_SYSTEM : BASE_SYSTEM(contextText, range),
       messages, baseUrl: settings.ollamaUrl,
     })
     setUsage((u) => ({
@@ -140,7 +154,7 @@ export default function App() {
       cacheWriteTokens: u.cacheWriteTokens + r.usage.cacheWriteTokens,
     }))
     return r.text
-  }, [settings, contextText, range])
+  }, [settings, contextText, range, general])
 
   const runTurn = useCallback(async (id, userMsg, display) => {
     setSelHighlight(null)
@@ -176,14 +190,13 @@ export default function App() {
     const id = crypto.randomUUID()
     setChats((cs) => [...cs, {
       id, page: sel.page, selection: sel.text, rects: sel.rects,
-      mode: 'technical', customInstruction: '', messages: [],
+      mode: 'basic', messages: [],
     }])
     setThreadId(id); setNotesOpen(false); setThreadsOpen(false); setFocus(false); setChatCollapsed(false)
   }, [doc, range])
 
-  const onSetMode = useCallback((id, mode, custom) => {
-    setChats((cs) => cs.map((c) => c.id === id
-      ? { ...c, mode, customInstruction: custom ?? c.customInstruction } : c))
+  const onSetMode = useCallback((id, mode) => {
+    setChats((cs) => cs.map((c) => c.id === id ? { ...c, mode } : c))
   }, [])
 
   const ask = (id, text) => {
@@ -192,7 +205,7 @@ export default function App() {
       const nid = crypto.randomUUID()
       setChats((cs) => [...cs, {
         id: nid, page: 0, selection: '', rects: [],
-        mode: 'custom', customInstruction: '', messages: [], title: 'General',
+        mode: 'basic', messages: [], title: 'General',
       }])
       setThreadId(nid)
       setTimeout(() => runTurn(nid, text, text), 0)
@@ -202,10 +215,7 @@ export default function App() {
     if (!chat) return
     if (!chat.selection) { if (text) runTurn(id, text, text); return }
     const label = MODES.find((m) => m.id === chat.mode).label
-    const base = buildUserTurn({
-      selection: chat.selection, mode: chat.mode, page: chat.page,
-      customInstruction: chat.customInstruction,
-    })
+    const base = buildUserTurn({ selection: chat.selection, mode: chat.mode, page: chat.page })
     if (!text) {
       const verb = chat.messages.length ? 'Re-explain' : 'Explain'
       runTurn(id, base, `${verb} this passage. (${label})`)
@@ -257,6 +267,8 @@ export default function App() {
     return hs
   }, [highlights, selHighlight])
 
+  if (mobile) return <MobileGate />
+
   return (
     <div
       className={'app' + (focus ? ' focused' : '')}
@@ -288,6 +300,7 @@ export default function App() {
           onContext={() => {}}
           contextLocked={locked}
           hasPaper={!!activeFile && !showLibrary}
+          activeFile={activeFile}
           popRef={popAt}
         />
       )}
@@ -307,6 +320,8 @@ export default function App() {
           ) : (
           <Library
             library={library} activeId={activeId} dragging={dragging}
+            liveStats={activeId ? { id: activeId, threads: chats.length, notes: annotations.length, highlights: highlights.length } : null}
+            inkColor={(HIGHLIGHT_COLORS.find((c) => c.id === settings.highlightColor) || HIGHLIGHT_COLORS[0]).solid}
             onOpen={openPaper} onDelete={deletePaper}
             onRename={(id, name) =>
               setLibrary((lib) => lib.map((x) => x.id === id ? { ...x, name } : x))}
@@ -361,6 +376,7 @@ export default function App() {
                     onAsk={ask}
                     onEditSelection={(id, text) =>
                       setChats((cs) => cs.map((c) => c.id === id ? { ...c, selection: text } : c))}
+                    general={general} setGeneral={setGeneral}
                     busy={busy} error={error}
                     annotations={annotations}
                     onDeleteNote={(id) => {
@@ -441,8 +457,15 @@ export default function App() {
       />
       <Modal
         open={modal?.kind === 'missing'}
-        title="File not loaded"
-        body={<>“{modal?.name}” isn’t open in this tab.<br /><br />Pick the file again — its threads are still saved.</>}
+        title="Pick the file again"
+        body={<>
+          Lattice Reader has no backend server — documents are never uploaded anywhere, and a
+          browser cannot keep a PDF in local storage. So “{modal?.name}” has to be re-opened from
+          your disk each session.
+          <br /><br />
+          Nothing is lost: your threads, annotations, and highlights for this document are saved
+          and will reattach as soon as you pick it.
+        </>}
         confirmLabel="Choose file"
         onConfirm={() => modal.onOk()} onCancel={() => setModal(null)}
       />

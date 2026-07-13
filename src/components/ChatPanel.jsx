@@ -5,59 +5,46 @@ import Markdown from './Markdown'
 export default function ChatPanel({
   chats, activeId, onSelectChat, onCloseChat, onSetMode, onAsk, onEditSelection,
   busy, error, annotations, onDeleteNote, onJumpToNote, notesOpen, setNotesOpen,
-  listOpen, setListOpen, onCollapse, onBlurNote,
+  listOpen, setListOpen, onCollapse, onBlurNote, general, setGeneral,
 }) {
   const chat = chats.find((c) => c.id === activeId)
   const [draft, setDraft] = useState('')
-  const [custom, setCustom] = useState('')
   const [selNote, setSelNote] = useState(null)
+  const [editing, setEditing] = useState(false) // snippet editor panel
+  const [editDraft, setEditDraft] = useState('')
   const endRef = useRef(null)
+  const editRef = useRef(null)
 
-  useEffect(() => { setCustom(chat?.customInstruction || '') }, [activeId])
+  useEffect(() => { setEditing(false) }, [activeId])
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chat?.messages.length, busy])
+  useEffect(() => { if (editing) setTimeout(() => editRef.current?.focus(), 30) }, [editing])
   useEffect(() => { if (!notesOpen && selNote) { setSelNote(null); onBlurNote?.() } }, [notesOpen])
-  // Clicking anywhere that isn't a note card deselects the current annotation.
   useEffect(() => {
     if (!selNote) return
     const onDown = (e) => {
       if (e.target.closest?.('.note-card')) return
-      setSelNote(null)
-      onBlurNote?.()
+      setSelNote(null); onBlurNote?.()
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [selNote, onBlurNote])
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [chat?.messages.length, busy])
 
   const started = chat && chat.messages.length > 0
   const modeLabel = chat && MODES.find((m) => m.id === chat.mode)?.label
-
   const snippet = (t, n = 44) => {
     const s = t.replace(/\s+/g, ' ').trim()
     return s.length > n ? s.slice(0, n) + '…' : s
   }
 
-  // Vertical thread list — replaces the chip strip.
-  const ThreadList = () => (
-    <div className="tlist">
-      {chats.length === 0 && <div className="tlist-empty">No threads yet.</div>}
-      {[...chats].reverse().map((c) => (
-        <button
-          key={c.id}
-          className={'titem' + (c.id === activeId ? ' on' : '')}
-          onClick={() => { onSelectChat(c.id); setListOpen(false); setNotesOpen(false) }}
-        >
-          <span className="titem-pg">{c.page ? 'p' + c.page : '·'}</span>
-          <span className="titem-txt">{c.selection ? snippet(c.selection) : (c.title || 'General')}</span>
-          <span className="titem-n">{Math.ceil(c.messages.length / 2)}</span>
-          <span
-            className="titem-x"
-            onClick={(e) => { e.stopPropagation(); onCloseChat(c.id) }}
-            title="Delete thread"
-          >×</span>
-        </button>
-      ))}
-    </div>
-  )
+  const openEditor = () => {
+    if (started || !chat?.selection) return
+    setEditDraft(chat.selection)
+    setEditing(true)
+  }
+  const commitEdit = () => {
+    if (editDraft.trim()) onEditSelection(chat.id, editDraft.trim())
+    setEditing(false)
+  }
 
   return (
     <aside className="chat">
@@ -70,11 +57,22 @@ export default function ChatPanel({
           Threads
           <span className="count">{chats.length}</span>
         </button>
-        {chat && !notesOpen && !listOpen && (
-          <span className="head-now" title={chat.selection || 'General'}>
-            {chat.selection ? 'p' + chat.page + ' · ' + snippet(chat.selection, 30) : (chat.title || 'General')}
+
+        {/* Document ⇄ General. In general mode the document is dropped from the
+            prompt entirely, so the model answers on the merits. */}
+        <button
+          className={'gswitch' + (general ? ' on' : '')}
+          onClick={() => setGeneral(!general)}
+          title={general
+            ? 'General mode: the document is not sent. Click to ground answers in it again.'
+            : 'Document mode: answers are grounded in the document. Click to ask general questions.'}
+        >
+          <span className="gswitch-track"><span className="gswitch-knob" /></span>
+          <span className="gswitch-label">
+            {general ? 'General chat' : 'Document mode'}
           </span>
-        )}
+        </button>
+
         <button className="collapse" onClick={onCollapse} title="Collapse panel">
           <svg viewBox="0 0 20 20"><path d="M8 4l6 6-6 6" /></svg>
         </button>
@@ -84,7 +82,7 @@ export default function ChatPanel({
         <div className="notes">
           {!annotations.length && (
             <div className="chat-empty">
-              <p>No annotations yet. Select text in the paper and press <kbd>A</kbd>.</p>
+              <p>No annotations yet. Select text and press <kbd>A</kbd>.</p>
             </div>
           )}
           {annotations.map((a) => (
@@ -109,84 +107,88 @@ export default function ChatPanel({
           ))}
         </div>
       ) : listOpen ? (
-        <ThreadList />
+        <div className="tlist">
+          {chats.length === 0 && <div className="tlist-empty">No threads yet.</div>}
+          {[...chats].reverse().map((c) => (
+            <button
+              key={c.id}
+              className={'titem' + (c.id === activeId ? ' on' : '')}
+              onClick={() => { onSelectChat(c.id); setListOpen(false); setNotesOpen(false) }}
+            >
+              <span className="titem-pg">{c.page ? 'p' + c.page : '·'}</span>
+              <span className="titem-txt">{c.selection ? snippet(c.selection) : (c.title || 'General')}</span>
+              <span className="titem-n">{Math.ceil(c.messages.length / 2)}</span>
+              <span className="titem-x" onClick={(e) => { e.stopPropagation(); onCloseChat(c.id) }}>×</span>
+            </button>
+          ))}
+        </div>
       ) : !chat ? (
         <>
           <div className="chat-empty">
-            <p>Ask anything about the document below, or select text and press <kbd>G</kbd> to open a thread about that passage. <kbd>A</kbd> annotates.</p>
+            <p>
+              Ask anything below, or select text and press <kbd>G</kbd> to open a thread about that
+              snippet. <kbd>A</kbd> annotates, <kbd>H</kbd> highlights.
+            </p>
           </div>
           <div className="composer">
             <textarea
               rows={2}
               value={draft}
-              placeholder="Ask anything about the document…"
+              placeholder={general ? 'Ask anything…' : 'Ask anything about the document…'}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
                   if (busy || !draft.trim()) return
-                  onAsk(null, draft.trim())
-                  setDraft('')
+                  onAsk(null, draft.trim()); setDraft('')
                 }
               }}
             />
-            <button
-              className="send"
-              disabled={busy || !draft.trim()}
-              title="Send"
-              onClick={() => { onAsk(null, draft.trim()); setDraft('') }}
-            >
+            <button className="send" disabled={busy || !draft.trim()} title="Send"
+              onClick={() => { onAsk(null, draft.trim()); setDraft('') }}>
               <svg viewBox="0 0 20 20"><path d="M3 10h13M11 5l5 5-5 5" /></svg>
             </button>
           </div>
         </>
       ) : (
         <>
-          {chat.selection && <div className="modes">
-            {MODES.map((m) => (
-              <button
-                key={m.id}
-                className={'mode' + (chat.mode === m.id ? ' on' : '')}
-                onClick={() => onSetMode(chat.id, m.id)}
-                title={m.blurb}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>}
-
-          {chat.selection && chat.mode === 'custom' && (
-            <div className="custom-row">
-              <input
-                value={custom}
-                placeholder="Instruction appended to every message in this thread…"
-                onChange={(e) => setCustom(e.target.value)}
-                onBlur={() => onSetMode(chat.id, 'custom', custom)}
-              />
+          {chat.selection && (
+            <div className="modes">
+              {MODES.map((m) => (
+                <button
+                  key={m.id}
+                  className={'mode' + (chat.mode === m.id ? ' on' : '')}
+                  onClick={() => onSetMode(chat.id, m.id)}
+                  title={m.blurb}
+                >
+                  {m.label}
+                </button>
+              ))}
             </div>
           )}
 
-          {/* Selection is editable until the first message is sent. */}
-          {chat.selection !== '' && <div className="quote-wrap">
-            <span className="quote-pg">
-              page {chat.page}{!started && <em> — editable</em>}
-            </span>
-            <textarea
-              className="quote-edit"
-              value={chat.selection}
-              readOnly={started}
-              rows={3}
-              onChange={(e) => onEditSelection(chat.id, e.target.value)}
-              title={started ? 'Locked once the thread has started' : 'Fix the extracted text before sending'}
-            />
-          </div>}
+          {chat.selection && (
+            <div className="quote-wrap">
+              <span className="quote-pg">
+                page {chat.page}
+                {!started && (
+                  <button className="quote-edit-btn" onClick={openEditor}>edit snippet</button>
+                )}
+              </span>
+              <div
+                className={'quote-view' + (!started ? ' editable' : '')}
+                onClick={openEditor}
+                title={started ? '' : 'Click to fix the extracted text'}
+              >
+                {chat.selection.replace(/\s+/g, ' ')}
+              </div>
+            </div>
+          )}
 
           <div className="msgs">
-                        {chat.messages.map((m, i) => (
+            {chat.messages.map((m, i) => (
               <div key={i} className={'msg ' + m.role}>
-                {m.role === 'assistant'
-                  ? <Markdown text={m.content} />
-                  : (m.display || m.content)}
+                {m.role === 'assistant' ? <Markdown text={m.content} /> : (m.display || m.content)}
               </div>
             ))}
             {busy && <div className="msg assistant pending">Thinking…</div>}
@@ -201,30 +203,24 @@ export default function ChatPanel({
               autoFocus
               placeholder={
                 !chat.selection
-                  ? 'Ask anything about the document…'
-                  : started
-                    ? 'Ask a follow-up…'
-                    : 'Press Enter to ask…'
+                  ? (general ? 'Ask anything…' : 'Ask anything about the document…')
+                  : started ? 'Ask a follow-up…' : 'Press Enter to ask…'
               }
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
                   if (busy) return
-                  onAsk(chat.id, draft.trim())
-                  setDraft('')
+                  onAsk(chat.id, draft.trim()); setDraft('')
                 }
               }}
             />
-            <button
-              className="send"
-              disabled={busy}
-              title={started && draft.trim() ? 'Send' : 'Ask'}
-              onClick={() => { onAsk(chat.id, draft.trim()); setDraft('') }}
-            >
+            <button className="send" disabled={busy} title="Send"
+              onClick={() => { onAsk(chat.id, draft.trim()); setDraft('') }}>
               <svg viewBox="0 0 20 20"><path d="M3 10h13M11 5l5 5-5 5" /></svg>
             </button>
           </div>
+
           {chat.selection && (
             <div className="composer-hint">
               {started
@@ -233,6 +229,32 @@ export default function ChatPanel({
             </div>
           )}
         </>
+      )}
+
+      {/* Snippet editor — full-size panel, same treatment as annotations. */}
+      {editing && chat && (
+        <div className="editor-bg" onMouseDown={commitEdit}>
+          <div className="editor" onMouseDown={(e) => e.stopPropagation()}>
+            <h3>Edit snippet <em>page {chat.page}</em></h3>
+            <p className="editor-note">
+              PDF extraction breaks ligatures, splits hyphens, and interleaves columns.
+              Fix it here before asking.
+            </p>
+            <textarea
+              ref={editRef}
+              value={editDraft}
+              onChange={(e) => setEditDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') { e.preventDefault(); setEditing(false) }
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commitEdit() }
+              }}
+            />
+            <div className="editor-actions">
+              <span className="editor-hint">{editDraft.trim().length} characters</span>
+              <button className="primary" onClick={commitEdit}>OK</button>
+            </div>
+          </div>
+        </div>
       )}
     </aside>
   )

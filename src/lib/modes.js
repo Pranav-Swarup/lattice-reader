@@ -1,56 +1,54 @@
 export const MODES = [
   {
     id: 'define',
-    label: 'Define',
-    blurb: 'A glossary of every technical term in the selection.',
+    label: 'Keyword',
+    blurb: 'A glossary of every technical term in the snippet.',
     instruction:
-      'Do not explain the snippet as a whole. Pull out every keyword, technical term, notation ' +
-      'symbol, and piece of jargon in the selection and define each in one plain sentence. Where ' +
-      "the document defines or uses a term elsewhere, use the document's meaning, not the generic one. " +
+      'Pull out every keyword, technical term, notation symbol, and piece of jargon in the ' +
+      'snippet, and define each in one plain sentence. Where the document has already fixed a ' +
+      "meaning for a term, use the document's meaning; where the term is standard in the field, " +
+      'say what it standardly means. If a symbol is defined elsewhere in the document, say where. ' +
       'Output a compact bulleted glossary and nothing else.',
   },
   {
-    id: 'naive',
-    label: 'Basic',
-    blurb: 'Assumes no background. Builds the basics first.',
+    id: 'basic',
+    label: 'Intuition',
+    blurb: 'The same thing, said plainly. Intuition before formalism.',
     instruction:
-      'Assume no background in this subfield. Teach the underlying idea from the ground up before ' +
-      'touching the snippet: what problem it exists to solve, what the moving parts are, why anyone ' +
-      'would do it this way. Use one concrete analogy. Only then say what this snippet claims. ' +
-      'Under 200 words. No jargon unless defined inline.',
-  },
-  {
-    id: 'technical',
-    label: 'Technical',
-    blurb: 'You know the area. Straight to what is being said.',
-    instruction:
-      'Assume the reader knows the general area but has not read this document. Skip background. ' +
-      "Explain precisely what this snippet does, how it connects to the document's contribution, what " +
-      'the notation refers to, and any assumption it quietly relies on. If it is easy to misread, ' +
-      'say so. Under 200 words.',
-  },
-  {
-    id: 'custom',
-    label: 'Custom',
-    blurb: 'Your own instruction, appended to every message in this thread.',
-    instruction: '',
+      'Restate this snippet in plain English — the same claim, in the simplest wording that is ' +
+      'still true. Go phrase by phrase where the original is dense: say what each piece is ' +
+      'actually saying. Then give the intuition underneath it: what is really going on here, why ' +
+      'would anyone do it this way, and what would go wrong if they did not.\n\n' +
+      'Reach for whatever makes it land — an analogy, a concrete example, a parallel to something ' +
+      'more familiar, a simpler special case. Assume the reader is smart but new to this corner of ' +
+      'the field, so unfamiliar background is fair game to bring in; you do not have to confine ' +
+      'yourself to what the document says. Do not condescend, and do not pad. Around 200 words.',
   },
 ]
 
 export const BASE_SYSTEM = (docText, range) =>
-  `You are a reading companion for an academic document. The text below is the document` +
-  (range ? ` (pages ${range[0]}–${range[1]} only — the reader has scoped context to this range)` : '') +
-  `. The reader works through it linearly and selects short snippets to ask about.\n\n` +
-  `Answer about the SELECTED SNIPPET ONLY, but use the rest of the text as context: resolve ` +
-  `notation, point back to where a term was defined, connect the snippet to the argument where ` +
-  `that helps. Never summarize the whole document unless asked. Be direct and concrete. Plain prose, ` +
-  `minimal formatting, no preamble.\n\n` +
+  `You are a reading companion for someone working through an academic document. Its text is ` +
+  `below` + (range ? ` (pages ${range[0]}–${range[1]}, the range they have scoped)` : '') + `. ` +
+  `They read linearly and select short snippets to ask about.\n\n` +
+  `Answer about the SELECTED SNIPPET. Use the rest of the document freely as context — resolve ` +
+  `notation, point back to where a term was defined, connect the snippet to the argument. But do ` +
+  `not treat the document as the boundary of what you know: bring in standard background, ` +
+  `well-known results, or a comparison to how this is usually done whenever that genuinely helps ` +
+  `the reader understand. If the document is unclear, wrong, or leaves something out, say so.\n\n` +
+  `Never summarize the whole document unless asked. Be direct and concrete. Plain prose, minimal ` +
+  `formatting, no preamble, no restating the question.\n\n` +
   `=== DOCUMENT TEXT ===\n${docText}\n=== END DOCUMENT TEXT ===`
 
-export function buildUserTurn({ selection, mode, customInstruction, page }) {
-  const m = MODES.find((x) => x.id === mode)
-  const instruction = mode === 'custom'
-    ? (customInstruction || 'Explain this snippet.')
-    : m.instruction
-  return `SELECTED SNIPPET (page ${page}):\n"""\n${selection}\n"""\n\nINSTRUCTION:\n${instruction}`
+// General mode: the document is dropped entirely. Prior turns may still be in the
+// history, so the model is told plainly that it is no longer bound by them.
+export const GENERAL_SYSTEM =
+  `You are a knowledgeable, direct assistant talking with a researcher. Earlier turns in this ` +
+  `conversation may have concerned a specific document; you no longer have that document, and you ` +
+  `are not confined to it. Answer on the merits, from general knowledge. If a question clearly ` +
+  `refers back to something from the document that you can no longer see, say so and ask for the ` +
+  `text. Be concise and concrete. No preamble.`
+
+export function buildUserTurn({ selection, mode, page }) {
+  const m = MODES.find((x) => x.id === mode) || MODES[1]
+  return `SELECTED SNIPPET (page ${page}):\n"""\n${selection}\n"""\n\nINSTRUCTION:\n${m.instruction}`
 }

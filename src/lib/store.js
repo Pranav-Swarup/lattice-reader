@@ -39,6 +39,16 @@ export const saveDoc = (id, doc) => {
   all[id] = doc
   write(K.docs, all)
 }
+// Cheap per-document stats for the library cards.
+export const docStats = (id) => {
+  const d = read(K.docs, {})[id]
+  return {
+    threads: d?.chats?.length ?? 0,
+    notes: d?.annotations?.length ?? 0,
+    highlights: d?.highlights?.length ?? 0,
+  }
+}
+
 export const dropDoc = (id) => {
   const all = read(K.docs, {})
   delete all[id]

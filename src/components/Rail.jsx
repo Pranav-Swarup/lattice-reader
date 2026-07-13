@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useInverter } from './InvertTool'
 
 const I = {
-  book: <><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11c.6 0 1 .4 1 1v15c0-.8-.9-1.5-2-1.5H5.5c-.8 0-1.5-.7-1.5-1.5v-11.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13c-.6 0-1 .4-1 1v15c0-.8.9-1.5 2-1.5h4.5c.8 0 1.5-.7 1.5-1.5V5.5z"/></>,
+  home: <><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9.6V19a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.6"/><path d="M9.8 20v-5.6h4.4V20"/></>,
   threads: <><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H9l-5 4v-4z"/><path d="M8 8h8M8 12h5"/></>,
   marker: <><path d="M15.5 3.5l5 5-8 8H8l-1.5-4 9-9z"/><path d="M4 21h16"/><path d="M12.5 6.5l5 5"/></>,
   add: <path d="M12 5v14M5 12h14"/>,
@@ -21,7 +22,10 @@ function Tip({ label, children, className, ...rest }) {
     <>
       <span
         className="tip-wrap"
-        onMouseEnter={(e) => setBox(e.currentTarget.getBoundingClientRect())}
+        onMouseEnter={(e) => {
+          const btn = e.currentTarget.querySelector('button')
+          if (btn) setBox(btn.getBoundingClientRect())
+        }}
         onMouseLeave={() => setBox(null)}
       >
         <button {...rest} className={className}>{children}</button>
@@ -45,11 +49,90 @@ const AnnotA = () => (
   </svg>
 )
 
+// Hovering the invert button reveals a side flyout with a download action.
+// While an export is running (or finished and waiting to be saved) the flyout
+// stays pinned open, so moving the mouse away doesn't hide the progress.
+function InvertControl({ paperDark, onToggleDark, disabled, activeFile }) {
+  const [hovering, setHovering] = useState(false)
+  const [box, setBox] = useState(null)
+  const { state, msg, pct, run, download, reset, isFor } = useInverter()
+  const timer = useRef(null)
+  const btnRef = useRef(null)
+
+  // A finished export belongs to one specific file. When the open document
+  // changes, drop it — otherwise the button stays stuck on "Download" and
+  // refuses to invert the new document.
+  useEffect(() => {
+    if (state === 'ready' && !isFor(activeFile)) reset()
+    if (state === 'error') reset()
+  }, [activeFile])
+
+  const busy = state === 'working'
+  const done = state === 'ready' && isFor(activeFile)
+  const pinned = busy || done            // can't be dismissed by moving away
+  const open = hovering || pinned
+
+  const place = () => {
+    const b = btnRef.current?.getBoundingClientRect()
+    if (b) setBox(b)
+  }
+  const show = () => { clearTimeout(timer.current); place(); setHovering(true) }
+  const hide = () => { timer.current = setTimeout(() => setHovering(false), 220) }
+
+  useEffect(() => { if (pinned) place() }, [pinned])
+
+  return (
+    <>
+      <span className="tip-wrap" onMouseEnter={show} onMouseLeave={hide}>
+        <button
+          ref={btnRef}
+          className={'tool' + (paperDark ? ' on' : '') + (pinned ? ' pinned' : '')}
+          onClick={onToggleDark}
+          disabled={disabled}
+        >
+          <Ico d={I.invert} />
+        </button>
+      </span>
+
+      {open && box && (
+        <div
+          className="invert-fly"
+          style={{ left: box.right + 12, top: box.top + box.height / 2 }}
+          onMouseEnter={() => clearTimeout(timer.current)}
+          onMouseLeave={hide}
+        >
+          <span className="fly-label">Invert document</span>
+
+          <button
+            className={'fly-btn' + (done ? ' ready' : '')}
+            disabled={!activeFile || busy}
+            onClick={() => {
+              if (done) { download(); reset(); setHovering(false) }  // dismiss once saved
+              else run(activeFile)
+            }}
+          >
+            <svg viewBox="0 0 20 20">
+              <path d="M10 3v10M6 9.5l4 4 4-4M4 16.5h12" />
+            </svg>
+            {busy ? 'Inverting…' : done ? 'Download PDF' : 'Export copy'}
+          </button>
+
+          {busy && (
+            <div className="fly-bar"><span style={{ width: pct + '%' }} /></div>
+          )}
+          {msg && <span className={'fly-msg' + (state === 'error' ? ' err' : '')}>{msg}</span>}
+          {state === 'idle' && <span className="fly-note">Exports an image-only PDF.</span>}
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function Rail({
   library, activeId, onPick, onAdd, onLibrary,
   paperDark, onToggleDark, onFocus, onSettings,
   onNotes, notesOn, onThreads, threadsOn,
-  onHighlighter, highlighterOn, onContext, contextLocked, hasPaper, popRef,
+  onHighlighter, highlighterOn, onContext, contextLocked, hasPaper, popRef, activeFile,
 }) {
   const shelf = [...library].reverse()
   const track = (key) => (e) => popRef(key, e.currentTarget.getBoundingClientRect())
@@ -58,7 +141,7 @@ export default function Rail({
     <nav className="rail">
       <div className="rail-top">
         <Tip className="brandmark" onClick={onLibrary} label="All documents">
-          <Ico d={I.book} />
+          <Ico d={I.home} />
         </Tip>
         <Tip
           className={'tool' + (threadsOn ? ' on' : '')}
@@ -92,10 +175,10 @@ export default function Rail({
           onClick={(e) => { track('highlight')(e); onHighlighter() }}
           disabled={!hasPaper} label="Highlight colour"
         ><Ico d={I.marker} /></Tip>
-        <Tip
-          className={'tool' + (paperDark ? ' on' : '')}
-          onClick={onToggleDark} disabled={!hasPaper} label="Invert paper"
-        ><Ico d={I.invert} /></Tip>
+        <InvertControl
+          paperDark={paperDark} onToggleDark={onToggleDark}
+          disabled={!hasPaper} activeFile={activeFile}
+        />
         <Tip className="tool" onClick={onFocus} disabled={!hasPaper} label="Focus mode">
           <Ico d={I.focus} />
         </Tip>
